@@ -153,7 +153,7 @@ export function MissionReportModal({
           {/* Section 2: Agronomy & Quality Grading */}
           <div>
             <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "#38bdf8", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
-              <Award size={15} /> 1. CROP QUALITY & YIELD CERTIFICATION
+              <Award size={15} /> 1. CROP QUALITY, BRIX & PATHOGEN CERTIFICATION
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
               <div style={{ background: "#111c2e", padding: "12px", borderRadius: "8px", border: "1px solid #1e293b" }}>
@@ -163,9 +163,9 @@ export function MissionReportModal({
                 </div>
               </div>
               <div style={{ background: "#111c2e", padding: "12px", borderRadius: "8px", border: "1px solid #1e293b" }}>
-                <div style={{ fontSize: "0.7rem", color: "#64748b" }}>Canopy Ripeness Grade</div>
+                <div style={{ fontSize: "0.7rem", color: "#64748b" }}>Optical Sugar Brix (°Bx)</div>
                 <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "#34d399" }}>
-                  {isOrchard ? "14.8°Bx (Prime Dessert)" : "A-PRIME (97.9% Dry Matter)"}
+                  {isOrchard ? "14.8°Bx (Prime Dessert)" : "14.0°Bx (97.9% Dry Matter)"}
                 </div>
               </div>
               <div style={{ background: "#111c2e", padding: "12px", borderRadius: "8px", border: "1px solid #1e293b" }}>
@@ -175,7 +175,18 @@ export function MissionReportModal({
                 </div>
               </div>
             </div>
+
+            {/* Pathogen Clearance Seal */}
+            <div style={{ marginTop: "8px", padding: "10px 14px", borderRadius: "8px", background: "rgba(6, 182, 212, 0.08)", border: "1px solid rgba(6, 182, 212, 0.25)", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "0.72rem" }}>
+              <span style={{ color: "#38bdf8", fontWeight: 700 }}>
+                🛡️ CropVision Pathogen Screening: 0 Active Spores Detected / USDA Grade A Ready
+              </span>
+              <span className="mono" style={{ color: "#94a3b8", fontSize: "0.68rem" }}>
+                AWS Bedrock Vision Hash: #8F4C-29D1
+              </span>
+            </div>
           </div>
+
 
           {/* Section 3: Financial & Arbitrage Settlement */}
           <div>

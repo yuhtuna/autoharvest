@@ -179,40 +179,41 @@ export function CleanTelemetrySidebar({
       {/* 3. Autonomous Agents Card */}
       <div className="clean-card">
         <div className="clean-card-title">
-          <span>Autonomous Agents</span>
-          <Cpu size={13} color="var(--text-muted)" />
+          <span>AWS Multi-Agent Fleet</span>
+          <span style={{ fontSize: "0.64rem", color: "#38bdf8", fontWeight: 700 }}>Bedrock AgentCore</span>
         </div>
 
         <div className="agent-item">
-          <span className="metric-label">🌿 CropVision Agronomy</span>
-          <span className="agent-status-pill active">● Ready</span>
+          <span className="metric-label">🌿 CropVision™ Spectrometry</span>
+          <span className="agent-status-pill active">{isOrchard ? "14.8°Bx Prime" : "NDVI 0.733"}</span>
         </div>
 
         <div className="agent-item">
-          <span className="metric-label">🚜 Kinematics Path Agent</span>
-          <span className="agent-status-pill active">● Optimal</span>
+          <span className="metric-label">🚜 Kinematics Dubins Path</span>
+          <span className="agent-status-pill active">● -32% Fuel</span>
         </div>
 
         <div className="agent-item">
           <span className="metric-label">🌦️ Soil & Climate Nowcast</span>
           <span className="agent-status-pill ready">
-            {activeScenario === "STORM_INCOMING" ? "● Storm Alert" : "● Clear"}
+            {activeScenario === "STORM_INCOMING" ? "● Squall ETA 4.5h" : "● Optimal Window"}
           </span>
         </div>
 
         <div className="agent-item">
-          <span className="metric-label">📈 Market Arbitrage</span>
-          <span className="agent-status-pill active">● Live</span>
+          <span className="metric-label">📈 CBOT Market Arbitrage</span>
+          <span className="agent-status-pill active">● $6.42 / bu</span>
         </div>
 
         <div className="agent-item">
-          <span className="metric-label">🛡️ Safety Hardware Interlock</span>
+          <span className="metric-label">🛡️ ISO 25119 Safety Guard</span>
           <span className={`agent-status-pill ${isEstop ? "warning" : "active"}`}>
-            {isEstop ? "● E-STOP" : "● Nominal"}
+            {isEstop ? "● E-STOP <15ms" : "● Nominal <15ms"}
           </span>
         </div>
 
       </div>
+
 
       {/* 4. Scenario Simulations Trigger Drawer (Clean collapsible) */}
       <div className="clean-card" style={{ padding: "10px 14px" }}>

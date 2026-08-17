@@ -14,11 +14,12 @@ import {
 import { sendCopilotQuery } from "../services/api";
 
 const PRESET_PROMPTS = [
+  "Plan selective picking for ripe clusters",
+  "What should we do about the blight pathogen?",
+  "Calculate net profit if wheat reaches $7.25",
   "Why is the combine slowing down on turns?",
   "What is the storm risk and squall ETA?",
-  "Calculate net profit if wheat reaches $7.25",
   "How many carbon credits have we generated?",
-  "What is the Brix ripeness of the canopy?",
 ];
 
 export function AgriCopilotModal({
@@ -28,11 +29,12 @@ export function AgriCopilotModal({
   missionPlan,
   currentFieldPreset,
   activeScenario,
+  initialContext = null,
 }) {
   const [messages, setMessages] = useState([
     {
       sender: "COPILOT",
-      text: "👋 **Hello! I'm AgriCopilot**, your multi-agent fleet assistant. I have real-time access to telemetry, kinematics path planning, weather nowcasts, CBOT futures, and safety supervisor systems. What would you like to know?",
+      text: "👋 **Hello! I'm AgriCopilot**, your multi-agent agronomy assistant powered by AWS Bedrock. I synthesize real-time crop scans, kinematics Dubins paths, weather nowcasts, CBOT futures, and safety interlocks. What would you like to plan or analyze?",
     },
   ]);
   const [inputVal, setInputVal] = useState("");
@@ -62,7 +64,9 @@ export function AgriCopilotModal({
         e_stop_active: telemetry?.e_stop_active,
         is_orchard: telemetry?.is_orchard,
         active_scenario: activeScenario,
+        ...(initialContext || {}),
       };
+
 
       const res = await sendCopilotQuery(textToSend, context);
       const botMsg = { sender: "COPILOT", text: res.response };
