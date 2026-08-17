@@ -3,10 +3,9 @@ import confetti from "canvas-confetti";
 
 import { Header } from "./components/Header";
 import { FieldMap2D } from "./components/FieldMap2D";
-import { AgentThoughtCards } from "./components/AgentThoughtCards";
-import { TelemetryHUD } from "./components/TelemetryHUD";
-import { MarketArbitrageCard } from "./components/MarketArbitrageCard";
-import { ChaosControlPanel } from "./components/ChaosControlPanel";
+import { Sidebar } from "./components/Sidebar";
+import { BottomDrawer } from "./components/BottomDrawer";
+import { StatusBar } from "./components/StatusBar";
 import { DroneVisionModal } from "./components/DroneVisionModal";
 
 import { fetchFields, scanField, triggerScenario, sendFleetControl } from "./services/api";
@@ -22,6 +21,11 @@ export default function App() {
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isDroneModalOpen, setIsDroneModalOpen] = useState(false);
+  
+  // Bottom Drawer state
+  const [drawerTab, setDrawerTab] = useState("AGENTS");
+  const [isDrawerExpanded, setIsDrawerExpanded] = useState(false);
+
   const hasCelebratedRef = useRef(false);
 
   // Load fields & initial plan on mount
@@ -154,33 +158,32 @@ export default function App() {
     }
   };
 
+  const handleOpenDrawerTab = (tabName) => {
+    setDrawerTab(tabName);
+    setIsDrawerExpanded(true);
+  };
+
   const currentFieldPreset = fields.find((f) => f.id === currentFieldId) || fields[0];
 
   return (
     <div className="app-container">
       
-      {/* Top Header */}
+      {/* 1. Minimal Top Header */}
       <Header
         fields={fields}
         currentFieldId={currentFieldId}
         onSelectField={handleSelectField}
         telemetry={telemetry}
-        activeScenario={activeScenario}
-        missionPlan={missionPlan}
         onOpenDroneModal={() => setIsDroneModalOpen(true)}
       />
 
-      {/* Main 3-Column Mission Control Grid */}
+      {/* 2. Main 2-Column Grid (Map 70% + Sidebar 30%) */}
       <main className="main-grid">
         
-        {/* Left Column: 5-Agent Collaborative Thought Cards */}
-        <section style={{ minHeight: 0, height: "100%" }}>
-          <AgentThoughtCards missionPlan={missionPlan} />
-        </section>
-
-        {/* Center Column: Digital Twin Canvas + Chaos Control Bar */}
-        <section style={{ display: "flex", flexDirection: "column", gap: "12px", minHeight: 0, height: "100%" }}>
-          <div style={{ flex: 1, minHeight: 0 }}>
+        {/* Left Area: Digital Twin Map + Collapsible Bottom Drawer */}
+        <section className="map-area">
+          
+          <div className="map-canvas-wrapper">
             <FieldMap2D
               fieldPreset={currentFieldPreset}
               missionPlan={missionPlan}
@@ -190,35 +193,40 @@ export default function App() {
             />
           </div>
 
-          <div style={{ flexShrink: 0 }}>
-            <ChaosControlPanel
-              onControlFleet={handleControlFleet}
-              onTriggerScenario={handleTriggerScenario}
-              activeScenario={activeScenario}
-              isSimulationRunning={isSimulationRunning}
-              isPaused={isPaused}
-              eStopActive={telemetry?.e_stop_active || false}
-            />
-          </div>
+          <BottomDrawer
+            activeTab={drawerTab}
+            onSelectTab={setDrawerTab}
+            isExpanded={isDrawerExpanded}
+            onToggleExpand={() => setIsDrawerExpanded(!isDrawerExpanded)}
+            missionPlan={missionPlan}
+            activeScenario={activeScenario}
+            onTriggerScenario={handleTriggerScenario}
+            cropType={currentFieldPreset?.crop_type}
+          />
+
         </section>
 
-        {/* Right Column: ROS2 Telemetry Cockpit + Market Arbitrage Card */}
-        <section style={{ display: "flex", flexDirection: "column", gap: "12px", minHeight: 0, height: "100%" }}>
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <TelemetryHUD telemetry={telemetry} />
-          </div>
-
-          <div style={{ flexShrink: 0 }}>
-            <MarketArbitrageCard
-              missionPlan={missionPlan}
-              cropType={currentFieldPreset?.crop_type}
-            />
-          </div>
-        </section>
+        {/* Right Area: Unified Mission Sidebar */}
+        <Sidebar
+          telemetry={telemetry}
+          missionPlan={missionPlan}
+          isSimulationRunning={isSimulationRunning}
+          isPaused={isPaused}
+          onControlFleet={handleControlFleet}
+          onOpenDrawerTab={handleOpenDrawerTab}
+        />
 
       </main>
 
-      {/* Drone Aerial POV & AI Computer Vision Modal */}
+      {/* 3. Slim Bottom Status Bar */}
+      <StatusBar
+        telemetry={telemetry}
+        missionPlan={missionPlan}
+        currentFieldPreset={currentFieldPreset}
+        activeScenario={activeScenario}
+      />
+
+      {/* 4. Drone Aerial POV & AI Computer Vision Modal */}
       <DroneVisionModal
         isOpen={isDroneModalOpen}
         onClose={() => setIsDroneModalOpen(false)}

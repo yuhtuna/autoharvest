@@ -358,7 +358,7 @@ export function FieldMap2D({
   }, [fieldPreset, missionPlan, telemetry, activeObstacle, activeScenario, showNDVI, showTrajectories, showHeadlands, showCutTrail, zoom]);
 
   return (
-    <div className="glass-panel" style={{ display: "flex", flexDirection: "column", height: "100%", position: "relative", overflow: "hidden" }}>
+    <div className="glass-panel" style={{ display: "flex", flexDirection: "column", height: "100%", position: "relative", overflow: "hidden", borderRadius: "14px 14px 0 0", borderBottom: "none" }}>
       
       {/* Top Map HUD Toolbar */}
       <div 
