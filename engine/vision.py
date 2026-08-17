@@ -213,11 +213,19 @@ class CropVisionAgent:
     ) -> Dict[str, Any]:
         """
         Analyzes a single image (uploaded Base64 or standard crop preset).
-        Runs OpenCV contour/color segmentation, calculates fruit bounding boxes,
-        optical Brix sugar concentration, blight risk, and 3D picking vectors.
+
+        When a real image is uploaded:
+          1. YOLOv8 runs GPU-accelerated inference for fruit detection (real bounding boxes)
+          2. HSV color analysis on each detected fruit ROI for ripeness/Brix estimation
+          3. If YOLO finds no fruit classes, falls back to OpenCV contour detection
+
+        When no image is uploaded (preset mode):
+          Uses synthetic demo detections (clearly labeled as SYNTHETIC_PRESET)
         """
         detections = []
         blight_alerts = []
+        detection_mode = "SYNTHETIC_PRESET"  # Will be overridden if real detection runs
+
         is_apple = "APPLE" in crop_type or "HONEYCRISP" in preset_id
         is_grape = "GRAPE" in crop_type or "VINEYARD" in preset_id
         is_citrus = "CITRUS" in crop_type or "ORANGE" in crop_type or "VALENCIA" in preset_id
@@ -235,59 +243,140 @@ class CropVisionAgent:
                 print(f"[CropVision] Image decode error: {e}")
 
         if decoded_cv_img is not None:
-            # Real image processing with OpenCV
-            h_img, w_img, _ = decoded_cv_img.shape
-            hsv = cv2.cvtColor(decoded_cv_img, cv2.COLOR_BGR2HSV)
-            
-            # Mask for reddish / orange / yellow ripe fruits
-            lower_red1 = np.array([0, 70, 50])
-            upper_red1 = np.array([25, 255, 255])
-            lower_red2 = np.array([160, 70, 50])
-            upper_red2 = np.array([180, 255, 255])
-            
-            mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
-            mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
-            fruit_mask = cv2.bitwise_or(mask1, mask2)
-            
-            contours, _ = cv2.findContours(fruit_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            
-            count = 0
-            for cnt in contours:
-                area = cv2.contourArea(cnt)
-                if 200 < area < (w_img * h_img * 0.4):
-                    x, y, w, h = cv2.boundingRect(cnt)
-                    aspect = float(w) / float(h)
-                    if 0.5 < aspect < 2.0:
-                        count += 1
-                        # Optical Brix estimate from HSV saturation & value
-                        roi_hsv = hsv[y:y+h, x:x+w]
-                        mean_sat = np.mean(roi_hsv[:, :, 1])
-                        mean_val = np.mean(roi_hsv[:, :, 2])
-                        sugar_brix = round(11.0 + (mean_sat / 255.0) * 4.5 + (mean_val / 255.0) * 1.5, 1)
-                        is_ripe = sugar_brix >= 13.2
-                        
+            h_img, w_img = decoded_cv_img.shape[:2]
+
+            # === REAL AI DETECTION: Try YOLOv8 first ===
+            yolo_detections = []
+            try:
+                from engine.detector import YOLODetector
+                detector = YOLODetector(confidence_threshold=0.20)
+
+                # Run YOLO with fruit_only=False first to see ALL detections,
+                # then filter. This lets us report what the model actually sees.
+                raw_yolo = detector.detect_from_bgr(
+                    decoded_cv_img, fruit_only=False, max_detections=30
+                )
+
+                # Separate fruit vs non-fruit detections
+                fruit_dets = [d for d in raw_yolo if d["is_fruit"]]
+                other_dets = [d for d in raw_yolo if not d["is_fruit"]]
+
+                if fruit_dets:
+                    detection_mode = "YOLO_V8_REAL_INFERENCE"
+                    for idx, det in enumerate(fruit_dets):
+                        # Run ripeness analysis on each YOLO-detected fruit ROI
+                        ripeness_info = detector.analyze_fruit_ripeness(
+                            decoded_cv_img, det, crop_type
+                        )
+
+                        x, y, w, h = det["bbox_xywh"]
                         detections.append({
-                            "id": f"UPLOAD_FRUIT_{count}",
-                            "label": f"{crop_type.split('_')[0]} Fruit",
-                            "bbox": [int(x), int(y), int(w), int(h)],
-                            "confidence": round(float(np.clip(0.85 + (area / 10000.0) * 0.1, 0.82, 0.99)), 2),
-                            "sugar_brix": float(sugar_brix),
-                            "ripeness_status": "PRIME_RIPE" if is_ripe else "DEVELOPING_FRUIT",
-                            "robotic_pick_target": bool(is_ripe),
+                            "id": f"YOLO_{det['class_name'].upper()}_{idx+1}",
+                            "label": f"{det['class_name'].title()} (YOLOv8 {det['confidence']:.0%})",
+                            "bbox": [x, y, w, h],
+                            "confidence": det["confidence"],
+                            "sugar_brix": ripeness_info["sugar_brix"],
+                            "ripeness_status": ripeness_info["ripeness_status"],
+                            "robotic_pick_target": ripeness_info["is_ripe"],
+                            "color_dominant": ripeness_info["color_dominant"],
+                            "color_hsv": ripeness_info["color_hsv_mean"],
+                            "yolo_class": det["class_name"],
+                            "yolo_class_id": det["class_id"],
                             "pick_vector_3d": {
                                 "x_mm": int(x * 0.8),
                                 "y_mm": int(y * 0.8),
                                 "z_depth_mm": int(350 + (1000 / max(10, w)))
                             }
                         })
-                        if count >= 24:
-                            break
-            
-            # If no obvious fruits segmented (e.g. general landscape), create default spatial targets
+
+                    # Also report non-fruit objects (people, vehicles) for safety
+                    if other_dets:
+                        for od in other_dets[:5]:
+                            if od["class_name"] in ("person", "car", "truck"):
+                                detections.append({
+                                    "id": f"SAFETY_{od['class_name'].upper()}_{1}",
+                                    "label": f"{od['class_name'].title()} (Safety Alert)",
+                                    "bbox": od["bbox_xywh"],
+                                    "confidence": od["confidence"],
+                                    "sugar_brix": 0,
+                                    "ripeness_status": "NOT_FRUIT_SAFETY_OBJECT",
+                                    "robotic_pick_target": False,
+                                    "yolo_class": od["class_name"],
+                                    "yolo_class_id": od["class_id"],
+                                    "pick_vector_3d": {"x_mm": 0, "y_mm": 0, "z_depth_mm": 0}
+                                })
+
+                else:
+                    print(f"[CropVision] YOLO found {len(raw_yolo)} objects but no fruit classes. Falling back to OpenCV.")
+
+            except Exception as e:
+                print(f"[CropVision] YOLO detection failed, falling back to OpenCV: {e}")
+
+            # === FALLBACK: OpenCV contour detection if YOLO found no fruits ===
             if not detections:
-                detections = self._generate_preset_detections("HONEYCRISP_ORCHARD", "APPLES_HONEYCRISP")
+                detection_mode = "OPENCV_CONTOUR_FALLBACK"
+                hsv = cv2.cvtColor(decoded_cv_img, cv2.COLOR_BGR2HSV)
+
+                # Mask for reddish / orange / yellow ripe fruits
+                lower_red1 = np.array([0, 70, 50])
+                upper_red1 = np.array([25, 255, 255])
+                lower_red2 = np.array([160, 70, 50])
+                upper_red2 = np.array([180, 255, 255])
+
+                mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
+                mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
+                fruit_mask = cv2.bitwise_or(mask1, mask2)
+
+                contours, _ = cv2.findContours(fruit_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+                count = 0
+                for cnt in contours:
+                    area = cv2.contourArea(cnt)
+                    if 200 < area < (w_img * h_img * 0.4):
+                        x, y, w, h = cv2.boundingRect(cnt)
+                        aspect = float(w) / float(h)
+                        if 0.5 < aspect < 2.0:
+                            count += 1
+                            roi_hsv = hsv[y:y+h, x:x+w]
+                            mean_sat = np.mean(roi_hsv[:, :, 1])
+                            mean_val = np.mean(roi_hsv[:, :, 2])
+                            sugar_brix = round(11.0 + (mean_sat / 255.0) * 4.5 + (mean_val / 255.0) * 1.5, 1)
+                            is_ripe = sugar_brix >= 13.2
+
+                            detections.append({
+                                "id": f"CV_CONTOUR_{count}",
+                                "label": f"{crop_type.split('_')[0]} Fruit (OpenCV)",
+                                "bbox": [int(x), int(y), int(w), int(h)],
+                                "confidence": round(float(np.clip(0.65 + (area / 10000.0) * 0.1, 0.60, 0.85)), 2),
+                                "sugar_brix": float(sugar_brix),
+                                "ripeness_status": "PRIME_RIPE" if is_ripe else "DEVELOPING_FRUIT",
+                                "robotic_pick_target": bool(is_ripe),
+                                "pick_vector_3d": {
+                                    "x_mm": int(x * 0.8),
+                                    "y_mm": int(y * 0.8),
+                                    "z_depth_mm": int(350 + (1000 / max(10, w)))
+                                }
+                            })
+                            if count >= 24:
+                                break
+
+            # If still nothing detected from a real image
+            if not detections:
+                detection_mode = "NO_FRUIT_DETECTED"
+                detections.append({
+                    "id": "NO_DETECTION",
+                    "label": "No fruit objects detected in image",
+                    "bbox": [0, 0, w_img, h_img],
+                    "confidence": 0.0,
+                    "sugar_brix": 0.0,
+                    "ripeness_status": "NO_FRUIT_IN_FRAME",
+                    "robotic_pick_target": False,
+                    "pick_vector_3d": {"x_mm": 0, "y_mm": 0, "z_depth_mm": 0}
+                })
+
         else:
-            # Preset synthetic generator with realistic agronomy profiles
+            # No image uploaded — use preset synthetic data (demo mode)
+            detection_mode = "SYNTHETIC_PRESET"
             detections = self._generate_preset_detections(preset_id, crop_type)
 
         # Check for Blight / Necrosis if requested
@@ -305,21 +394,23 @@ class CropVisionAgent:
         ripe_count = sum(1 for d in detections if "RIPE" in d.get("ripeness_status", "") or "VINTAGE" in d.get("ripeness_status", "") or "PRIME" in d.get("ripeness_status", ""))
         total_count = max(1, len(detections))
         ripe_pct = round((ripe_count / total_count) * 100.0, 1)
-        mean_brix = round(float(np.mean([d.get("sugar_brix", 14.0) for d in detections])), 1)
+        brix_vals = [d.get("sugar_brix", 0) for d in detections if d.get("sugar_brix", 0) > 0]
+        mean_brix = round(float(np.mean(brix_vals)), 1) if brix_vals else 0.0
 
         # Human-in-the-Loop Strategic Directive
         if ripe_pct >= 75.0:
-            directive = f"RECOMMEND IMMEDIATE HARVEST: {ripe_pct}% of crop is at peak sugar concentration ({mean_brix}°Bx)."
+            directive = f"RECOMMEND IMMEDIATE HARVEST: {ripe_pct}% of crop is at peak sugar concentration ({mean_brix}Bx)."
             action_code = "DISPATCH_HARVEST_CREW"
         elif ripe_pct >= 40.0:
             directive = f"SELECTIVE PICKING RECOMMENDED: {ripe_count} prime clusters ready. Schedule robotic arms or hand crews."
             action_code = "SELECTIVE_PICK_ROBOTIC"
         else:
-            directive = f"DELAY HARVEST: Crop is currently developing (Mean {mean_brix}°Bx). Re-scan in 4-6 days."
+            directive = f"DELAY HARVEST: Crop is currently developing (Mean {mean_brix}Bx). Re-scan in 4-6 days."
             action_code = "HOLD_AND_MONITOR"
 
         return {
             "status": "IMAGE_DIAGNOSTIC_COMPLETE",
+            "detection_mode": detection_mode,
             "preset_id": preset_id,
             "crop_type": crop_type,
             "total_objects_detected": total_count,
@@ -331,8 +422,9 @@ class CropVisionAgent:
             "detections": detections,
             "harvest_directive": directive,
             "action_code": action_code,
-            "confidence_score": 0.982
+            "confidence_score": round(float(np.mean([d.get("confidence", 0.5) for d in detections])), 3)
         }
+
 
     def _generate_preset_detections(self, preset_id: str, crop_type: str) -> List[Dict[str, Any]]:
         """Generates realistic visual detections for the 4 standard agricultural presets."""
