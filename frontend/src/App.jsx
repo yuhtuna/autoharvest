@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import confetti from "canvas-confetti";
 
 import { Header } from "./components/Header";
@@ -20,7 +20,7 @@ export default function App() {
   const [activeScenario, setActiveScenario] = useState("NORMAL_HARVEST");
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [hasCelebrated, setHasCelebrated] = useState(false);
+  const hasCelebratedRef = useRef(false);
 
   // Load fields & initial plan on mount
   useEffect(() => {
@@ -58,8 +58,8 @@ export default function App() {
     const unsubscribe = fleetWS.subscribe((data) => {
       if (data.type === "TELEMETRY") {
         setTelemetry(data.telemetry);
-        if (data.telemetry?.cut_progress_pct >= 99.5 && !hasCelebrated) {
-          setHasCelebrated(true);
+        if (data.telemetry?.cut_progress_pct >= 99.5 && !hasCelebratedRef.current) {
+          hasCelebratedRef.current = true;
           confetti({
             particleCount: 120,
             spread: 80,
@@ -78,7 +78,7 @@ export default function App() {
         if (data.scenario) setActiveScenario(data.scenario);
         if (data.scenario === "RESET") {
           setActiveObstacle(null);
-          setHasCelebrated(false);
+          hasCelebratedRef.current = false;
         }
       }
     });
@@ -92,7 +92,7 @@ export default function App() {
   // Handle Field Switching
   const handleSelectField = async (fieldId) => {
     setCurrentFieldId(fieldId);
-    setHasCelebrated(false);
+    hasCelebratedRef.current = false;
     const selectedField = fields.find((f) => f.id === fieldId);
     if (!selectedField) return;
 
@@ -117,7 +117,7 @@ export default function App() {
     setActiveScenario(scenarioType);
     if (scenarioType === "RESET") {
       setActiveObstacle(null);
-      setHasCelebrated(false);
+      hasCelebratedRef.current = false;
     }
     try {
       const res = await triggerScenario(currentFieldId, scenarioType);
@@ -141,7 +141,7 @@ export default function App() {
     } else if (command === "RESET") {
       setIsSimulationRunning(false);
       setIsPaused(false);
-      setHasCelebrated(false);
+      hasCelebratedRef.current = false;
       setActiveObstacle(null);
     }
 
