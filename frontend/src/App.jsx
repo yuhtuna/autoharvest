@@ -7,6 +7,7 @@ import { AgentThoughtCards } from "./components/AgentThoughtCards";
 import { TelemetryHUD } from "./components/TelemetryHUD";
 import { MarketArbitrageCard } from "./components/MarketArbitrageCard";
 import { ChaosControlPanel } from "./components/ChaosControlPanel";
+import { DroneVisionModal } from "./components/DroneVisionModal";
 
 import { fetchFields, scanField, triggerScenario, sendFleetControl } from "./services/api";
 import { fleetWS } from "./services/websocket";
@@ -20,6 +21,7 @@ export default function App() {
   const [activeScenario, setActiveScenario] = useState("NORMAL_HARVEST");
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [isDroneModalOpen, setIsDroneModalOpen] = useState(false);
   const hasCelebratedRef = useRef(false);
 
   // Load fields & initial plan on mount
@@ -165,6 +167,7 @@ export default function App() {
         telemetry={telemetry}
         activeScenario={activeScenario}
         missionPlan={missionPlan}
+        onOpenDroneModal={() => setIsDroneModalOpen(true)}
       />
 
       {/* Main 3-Column Mission Control Grid */}
@@ -214,6 +217,13 @@ export default function App() {
         </section>
 
       </main>
+
+      {/* Drone Aerial POV & AI Computer Vision Modal */}
+      <DroneVisionModal
+        isOpen={isDroneModalOpen}
+        onClose={() => setIsDroneModalOpen(false)}
+        currentCropType={currentFieldPreset?.crop_type}
+      />
 
     </div>
   );

@@ -55,3 +55,23 @@ export async function fetchMarketData() {
   if (!res.ok) throw new Error("Failed to fetch market data");
   return res.json();
 }
+
+export async function fetchVideoSamples() {
+  const res = await fetch(`${API_BASE}/video-samples`);
+  if (!res.ok) throw new Error("Failed to fetch video samples");
+  return res.json();
+}
+
+export async function analyzeVideo(videoSource, cropType) {
+  const res = await fetch(`${API_BASE}/analyze-video`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      video_source: videoSource,
+      crop_type: cropType,
+    }),
+  });
+  if (!res.ok) throw new Error("Video analysis failed");
+  return res.json();
+}
+

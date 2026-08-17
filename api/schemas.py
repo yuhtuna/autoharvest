@@ -102,3 +102,9 @@ class FieldPreset(BaseModel):
     default_moisture_pct: float
     default_temp_c: float
     description: str
+
+
+class VideoAnalysisRequest(BaseModel):
+    video_source: Optional[str] = "DRONE_ORCHARD_APPLE_POV"
+    crop_type: Optional[str] = "APPLES_HONEYCRISP"
+

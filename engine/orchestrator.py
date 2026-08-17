@@ -61,6 +61,7 @@ class AutoHarvestOrchestrator:
         # Step 2: Kinematics & Robotics Path Agent
         kinematics_res = self.kinematics.generate_coverage_path(
             polygon_coords=coordinates_polygon,
+            crop_type=crop_type,
             num_swaths=10,
             points_per_swath=14,
         )
@@ -103,23 +104,30 @@ class AutoHarvestOrchestrator:
             mission_status = "SAFETY_ESTOP_ENGAGED"
         elif telemetry_res["status"] == "DELAY_RECOMMENDED":
             mission_status = "HARVEST_DELAYED_SOIL_WET"
-        elif vision_res["harvestability"] == "IMMEDIATE_HARVEST_OPTIMAL" or storm_incoming:
+        elif vision_res["harvestability"] in ["IMMEDIATE_HARVEST_OPTIMAL", "READY_FOR_ROBOTIC_PICKING"] or storm_incoming:
             mission_status = "HARVEST_RECOMMENDED"
         else:
             mission_status = "HARVEST_READY_NORMAL"
 
+        is_orchard = kinematics_res.get("is_orchard", False)
+        unit_id = "ORCHARD_ROVER_01" if is_orchard else "COMBINE_UNIT_01"
+
         assigned_units = [
             {
-                "harvester_id": "COMBINE_UNIT_01",
-                "model": "John Deere X9 1100 Autonomous",
+                "harvester_id": unit_id,
+                "model": kinematics_res.get("harvester_model", "John Deere X9 1100 Autonomous"),
+                "fleet_mode": kinematics_res.get("fleet_mode", "GRAIN_COMBINE_HARVESTER"),
                 "heading_deg": kinematics_res["heading_initial_deg"],
                 "cutter_height_cm": kinematics_res["cutter_height_cm"],
                 "optimal_speed_kmh": kinematics_res["optimal_speed_kmh"],
                 "waypoints_count": kinematics_res["waypoints_count"],
                 "current_position": initial_pos,
                 "grain_tank_capacity_pct": 14.5,
-                "engine_rpm": 2150,
-                "header_torque_nm": 680,
+                "fruits_picked_count": 84 if is_orchard else 0,
+                "gripper_cycles_cpm": 48 if is_orchard else 0,
+                "suction_kpa": 85.0 if is_orchard else 0,
+                "engine_rpm": 1450 if is_orchard else 2150,
+                "header_torque_nm": 340 if is_orchard else 680,
                 "fuel_level_pct": 88.0,
                 "rtk_accuracy_mm": 14.2,
             }
@@ -202,3 +210,16 @@ class AutoHarvestOrchestrator:
             "safety_details": safety_res,
             "agent_thought_stream": master_thought_stream,
         }
+
+    def process_drone_video(
+        self,
+        video_source: str = "SAMPLE_DRONE_FLIGHT",
+        crop_type: str = "APPLES_HONEYCRISP",
+    ) -> Dict[str, Any]:
+        """
+        Runs CropVision video processing pipeline on uploaded or sample drone footage.
+        """
+        return self.crop_vision.process_video_footage(
+            video_path_or_preset=video_source,
+            crop_type=crop_type,
+        )

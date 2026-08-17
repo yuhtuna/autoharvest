@@ -34,6 +34,8 @@ class WebSocketManager:
 
         # Harvester state
         self.harvester_id = "COMBINE_UNIT_01"
+        self.fleet_mode = "GRAIN_COMBINE_HARVESTER"
+        self.is_orchard = False
         self.current_pos = [-96.81134, 41.2555]
         self.heading = 180.0
         self.speed_kmh = 6.8
@@ -41,6 +43,9 @@ class WebSocketManager:
         self.engine_rpm = 2150
         self.header_torque_nm = 680
         self.grain_tank_pct = 12.4
+        self.fruits_picked_count = 45
+        self.gripper_cycles_cpm = 48.0
+        self.suction_kpa = 85.0
         self.fuel_level_pct = 88.5
         self.rtk_drift_mm = 12.4
         self.cut_progress_pct = 0.0
@@ -89,6 +94,8 @@ class WebSocketManager:
     def get_telemetry_payload(self) -> Dict[str, Any]:
         return {
             "harvester_id": self.harvester_id,
+            "fleet_mode": self.fleet_mode,
+            "is_orchard": self.is_orchard,
             "position": self.current_pos,
             "heading_deg": round(self.heading, 1),
             "speed_kmh": round(self.speed_kmh, 1),
@@ -96,6 +103,9 @@ class WebSocketManager:
             "engine_rpm": int(self.engine_rpm + random.randint(-15, 15)),
             "header_torque_nm": int(self.header_torque_nm + random.randint(-8, 8)),
             "grain_tank_pct": round(min(100.0, self.grain_tank_pct), 1),
+            "fruits_picked_count": int(self.fruits_picked_count),
+            "gripper_cycles_cpm": round(self.gripper_cycles_cpm, 1),
+            "suction_kpa": round(self.suction_kpa + random.uniform(-1.5, 1.5), 1),
             "fuel_level_pct": round(max(0.0, self.fuel_level_pct), 1),
             "rtk_drift_mm": round(self.rtk_drift_mm + random.uniform(-0.8, 0.8), 1),
             "cut_progress_pct": round(self.cut_progress_pct, 1),
@@ -108,10 +118,29 @@ class WebSocketManager:
     def load_mission_plan(self, plan: Dict[str, Any]):
         self.current_plan = plan
         self.current_field_id = plan["field_id"]
+        
+        assigned = plan.get("assigned_units", [{}])[0]
+        self.fleet_mode = assigned.get("fleet_mode", "GRAIN_COMBINE_HARVESTER")
+        self.is_orchard = ("ORCHARD" in self.fleet_mode) or ("APPLE" in plan.get("crop_type", "")) or ("GRAPE" in plan.get("crop_type", ""))
+        self.harvester_id = assigned.get("harvester_id", "COMBINE_UNIT_01")
+        
         if "kinematics_details" in plan and "waypoints" in plan["kinematics_details"]:
             self.waypoints = plan["kinematics_details"]["waypoints"]
         else:
             self.waypoints = []
+
+        self.current_waypoint_idx = 0
+        self.sub_step = 0.0
+        self.cut_progress_pct = 0.0
+        self.grain_tank_pct = 5.0
+        self.fruits_picked_count = 42 if self.is_orchard else 0
+        self.fuel_level_pct = 95.0
+        self.e_stop_active = plan.get("e_stop_active", False)
+        self.safety_alert = plan.get("safety_status", "GEOFENCE_ACTIVE_ALL_CLEAR")
+
+        if self.waypoints:
+            self.current_pos = [self.waypoints[0]["lon"], self.waypoints[0]["lat"]]
+            self.heading = self.waypoints[0].get("heading_deg", 180.0)
 
         self.current_waypoint_idx = 0
         self.sub_step = 0.0
@@ -224,22 +253,26 @@ class WebSocketManager:
                             target_heading = (math.degrees(angle_rad) + 360.0) % 360.0
                             self.heading = target_heading
 
-                        # Set cutter parameters depending on waypoint type
+                        # Set parameters depending on waypoint type and fleet mode
                         wp_type = wp_b.get("type", "HARVEST_SWATH")
                         if wp_type == "DUBINS_HEADLAND_TURN":
                             self.cutter_height_cm = 35.0
-                            self.speed_kmh = 3.8
-                            self.engine_rpm = 1650
-                            self.header_torque_nm = 280
+                            self.speed_kmh = 2.2 if self.is_orchard else 3.8
+                            self.engine_rpm = 1100 if self.is_orchard else 1650
+                            self.header_torque_nm = 120 if self.is_orchard else 280
+                            self.gripper_cycles_cpm = 0.0
                         else:
-                            self.cutter_height_cm = 15.0
-                            self.speed_kmh = 6.8
-                            self.engine_rpm = 2150
-                            self.header_torque_nm = 680
+                            self.cutter_height_cm = 0.0 if self.is_orchard else 15.0
+                            self.speed_kmh = 3.2 if self.is_orchard else 6.8
+                            self.engine_rpm = 1450 if self.is_orchard else 2150
+                            self.header_torque_nm = 340 if self.is_orchard else 680
+                            self.gripper_cycles_cpm = 48.0 if self.is_orchard else 0.0
 
-                        # Progress & Tank accumulation
+                        # Progress & Tank / Fruit accumulation
                         self.cut_progress_pct = (self.current_waypoint_idx / (len(self.waypoints) - 1)) * 100.0
                         self.grain_tank_pct = min(100.0, self.grain_tank_pct + (0.012 * self.speed_multiplier))
+                        if self.is_orchard and wp_type != "DUBINS_HEADLAND_TURN":
+                            self.fruits_picked_count = min(1200, self.fruits_picked_count + (0.45 * self.speed_multiplier))
                         self.fuel_level_pct = max(0.0, self.fuel_level_pct - (0.003 * self.speed_multiplier))
 
                         # Check obstacle proximity if obstacle exists

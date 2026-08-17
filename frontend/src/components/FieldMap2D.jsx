@@ -241,13 +241,14 @@ export function FieldMap2D({
       ctx.fillText(`🛑 ${activeObstacle.type}`, ox + obsRadiusPx + 10, oy + 2);
     }
 
-    // 8. Draw Live Autonomous Harvester Unit
+    // 8. Draw Live Autonomous Harvester / Robotic Picker Unit
     if (telemetry?.position) {
       const hx = toCanvasX(telemetry.position[0]);
       const hy = toCanvasY(telemetry.position[1]);
       const headingDeg = telemetry.heading_deg ?? 180.0;
       const headingRad = (headingDeg * Math.PI) / 180.0;
       const isEstop = telemetry.e_stop_active;
+      const isOrchard = telemetry?.is_orchard || fieldPreset?.crop_type?.includes("APPLE") || fieldPreset?.crop_type?.includes("GRAPE");
 
       ctx.save();
       ctx.translate(hx, hy);
@@ -255,50 +256,90 @@ export function FieldMap2D({
 
       // Light Cone (Headlights forward)
       if (!isEstop) {
-        const grad = ctx.createRadialGradient(0, 0, 10, 0, 50, 60);
-        grad.addColorStop(0, "rgba(251, 191, 36, 0.45)");
-        grad.addColorStop(1, "rgba(251, 191, 36, 0.0)");
+        const grad = ctx.createRadialGradient(0, 0, 10, 0, 45, 55);
+        grad.addColorStop(0, "rgba(6, 182, 212, 0.5)");
+        grad.addColorStop(1, "rgba(6, 182, 212, 0.0)");
         ctx.fillStyle = grad;
         ctx.beginPath();
         ctx.moveTo(0, 0);
-        ctx.lineTo(-30, 70);
-        ctx.lineTo(30, 70);
+        ctx.lineTo(-25, 60);
+        ctx.lineTo(25, 60);
         ctx.closePath();
         ctx.fill();
       }
 
-      // 30ft Cutter Bar (Front Header)
-      ctx.fillStyle = isEstop ? "#ef4444" : "#fbbf24";
-      ctx.fillRect(-22, 14, 44, 7);
+      if (isOrchard) {
+        // Robotic Picking Rover Chassis
+        ctx.fillStyle = isEstop ? "#b91c1c" : "#0369a1";
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(-14, -18, 28, 36, 6);
+        ctx.fill();
+        ctx.stroke();
 
-      // Combine Harvester Main Chassis
-      ctx.fillStyle = isEstop ? "#b91c1c" : "#22c55e";
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.roundRect(-12, -22, 24, 38, 4);
-      ctx.fill();
-      ctx.stroke();
+        // 4x Delta Robotic Picking Arms
+        ctx.strokeStyle = isEstop ? "#ef4444" : "#38bdf8";
+        ctx.lineWidth = 2.5;
+        // Left Arms
+        ctx.beginPath();
+        ctx.moveTo(-14, -6);
+        ctx.lineTo(-26, -10);
+        ctx.moveTo(-14, 8);
+        ctx.lineTo(-26, 12);
+        // Right Arms
+        ctx.moveTo(14, -6);
+        ctx.lineTo(26, -10);
+        ctx.moveTo(14, 8);
+        ctx.lineTo(26, 12);
+        ctx.stroke();
 
-      // Cab Windshield
-      ctx.fillStyle = "#38bdf8";
-      ctx.fillRect(-8, 2, 16, 8);
+        // Suction Gripper Pads
+        ctx.fillStyle = "#fbbf24";
+        ctx.fillRect(-29, -12, 5, 5);
+        ctx.fillRect(-29, 10, 5, 5);
+        ctx.fillRect(24, -12, 5, 5);
+        ctx.fillRect(24, 10, 5, 5);
 
-      // Grain Tank
-      ctx.fillStyle = "#f59e0b";
-      ctx.fillRect(-9, -18, 18, 14);
+        // Fruit Collection Bin
+        ctx.fillStyle = "#10b981";
+        ctx.fillRect(-10, -14, 20, 14);
 
-      // Wheels / Tracks
-      ctx.fillStyle = "#1e293b";
-      ctx.fillRect(-15, -16, 4, 16);
-      ctx.fillRect(11, -16, 4, 16);
-      ctx.fillRect(-15, 6, 4, 14);
-      ctx.fillRect(11, 6, 4, 14);
+      } else {
+        // Broadacre Combine Harvester
+        // 30ft Cutter Bar (Front Header)
+        ctx.fillStyle = isEstop ? "#ef4444" : "#fbbf24";
+        ctx.fillRect(-22, 14, 44, 7);
+
+        // Combine Harvester Main Chassis
+        ctx.fillStyle = isEstop ? "#b91c1c" : "#22c55e";
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(-12, -22, 24, 38, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        // Cab Windshield
+        ctx.fillStyle = "#38bdf8";
+        ctx.fillRect(-8, 2, 16, 8);
+
+        // Grain Tank
+        ctx.fillStyle = "#f59e0b";
+        ctx.fillRect(-9, -18, 18, 14);
+
+        // Wheels / Tracks
+        ctx.fillStyle = "#1e293b";
+        ctx.fillRect(-15, -16, 4, 16);
+        ctx.fillRect(11, -16, 4, 16);
+        ctx.fillRect(-15, 6, 4, 14);
+        ctx.fillRect(11, 6, 4, 14);
+      }
 
       ctx.restore();
 
-      // Harvester Label Tag
-      ctx.fillStyle = isEstop ? "#fca5a5" : "#a7f3d0";
+      // Vehicle Label Tag
+      ctx.fillStyle = isEstop ? "#fca5a5" : (isOrchard ? "#38bdf8" : "#a7f3d0");
       ctx.font = "bold 11px JetBrains Mono, monospace";
       ctx.fillText(
         `${telemetry.harvester_id} [${telemetry.speed_kmh} km/h]`,
@@ -307,7 +348,7 @@ export function FieldMap2D({
       );
 
       // RTK Lock Crosshair
-      ctx.strokeStyle = "rgba(6, 182, 212, 0.7)";
+      ctx.strokeStyle = isOrchard ? "rgba(56, 189, 248, 0.7)" : "rgba(16, 185, 129, 0.7)";
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.arc(hx, hy, 16, 0, Math.PI * 2);

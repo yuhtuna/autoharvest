@@ -10,6 +10,7 @@ from api.schemas import (
     SimulateScenarioRequest,
     FleetControlRequest,
     FieldPreset,
+    VideoAnalysisRequest,
 )
 from api.websocket_manager import ws_manager
 from engine.orchestrator import AutoHarvestOrchestrator
@@ -69,6 +70,40 @@ FIELD_PRESETS: Dict[str, FieldPreset] = {
         default_moisture_pct=13.8,
         default_temp_c=29.0,
         description="Premium export soybeans. High spot-market price sensitivity."
+    ),
+    "FIELD_WA_ORCHARD_4": FieldPreset(
+        id="FIELD_WA_ORCHARD_4",
+        name="Yakima Valley Block 4 (Honeycrisp)",
+        location="Yakima County, Washington, USA",
+        crop_type="APPLES_HONEYCRISP",
+        crop_display_name="Honeycrisp Dessert Apples (Orchard)",
+        area_hectares=28.4,
+        coordinates_polygon=[
+            [-120.505, 46.602],
+            [-120.494, 46.602],
+            [-120.494, 46.595],
+            [-120.505, 46.595],
+        ],
+        default_moisture_pct=12.2,
+        default_temp_c=21.0,
+        description="High-density apple orchard. Autonomous rover with 4x robotic vacuum gripper arms and optical Brix sugar ripeness grading."
+    ),
+    "FIELD_CA_NAPA_GRAPES": FieldPreset(
+        id="FIELD_CA_NAPA_GRAPES",
+        name="Stag's Leap Vineyard Block 8",
+        location="Napa Valley, California, USA",
+        crop_type="GRAPES_CABERNET",
+        crop_display_name="Cabernet Sauvignon Wine Grapes",
+        area_hectares=22.0,
+        coordinates_polygon=[
+            [-122.312, 38.405],
+            [-122.301, 38.405],
+            [-122.301, 38.398],
+            [-122.312, 38.398],
+        ],
+        default_moisture_pct=14.5,
+        default_temp_c=25.0,
+        description="Premium estate viticulture. Multi-spectral sugar Brix ripeness monitoring and precision berry cluster harvesting."
     ),
 }
 
@@ -234,3 +269,50 @@ def get_market_data():
 @router.get("/telemetry")
 def get_telemetry():
     return ws_manager.get_telemetry_payload()
+
+
+@router.get("/video-samples")
+def get_video_samples():
+    return [
+        {
+            "id": "DRONE_ORCHARD_APPLE_POV",
+            "title": "Yakima Orchard Aerial Drone Scan (Honeycrisp 4K)",
+            "crop_type": "APPLES_HONEYCRISP",
+            "resolution": "3840x2160 (4K UHD)",
+            "framerate": "60 fps",
+            "altitude_m": 4.5,
+            "description": "Low-altitude autonomous UAV flight over Honeycrisp apple canopy. Target fruit Brix ripeness analysis."
+        },
+        {
+            "id": "DRONE_WHEAT_FIELD_SCAN",
+            "title": "Platte River Basin Wheat Headlands Scan",
+            "crop_type": "WHEAT_HARD_RED",
+            "resolution": "1920x1080 (FHD)",
+            "framerate": "30 fps",
+            "altitude_m": 12.0,
+            "description": "Multispectral canopy overview. Weed and fungal blight segmenter."
+        },
+        {
+            "id": "TRACTOR_POV_NAPA_GRAPES",
+            "title": "Napa Valley Trellis Harvester Front-Mount Camera",
+            "crop_type": "GRAPES_CABERNET",
+            "resolution": "1920x1080 (FHD)",
+            "framerate": "60 fps",
+            "altitude_m": 1.8,
+            "description": "Onboard ISOBUS tractor camera detecting grape cluster density and sugar Brix concentration."
+        }
+    ]
+
+
+@router.post("/analyze-video")
+async def analyze_video(req: VideoAnalysisRequest):
+    """
+    Runs CropVision AI frame-by-frame computer vision analysis on uploaded or sample video.
+    """
+    result = orchestrator.process_drone_video(
+        video_source=req.video_source or "DRONE_ORCHARD_APPLE_POV",
+        crop_type=req.crop_type or "APPLES_HONEYCRISP",
+    )
+    return result
+
+

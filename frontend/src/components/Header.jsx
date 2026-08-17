@@ -17,6 +17,7 @@ export function Header({
   telemetry,
   activeScenario,
   missionPlan,
+  onOpenDroneModal,
 }) {
   const currentField = fields.find((f) => f.id === currentFieldId) || fields[0];
   const safetyStatus = telemetry?.safety_status || missionPlan?.safety_status || "GEOFENCE_ACTIVE_ALL_CLEAR";
@@ -25,6 +26,7 @@ export function Header({
     ? (safetyStatus.includes("ESTOP") ? "E-STOP: OBSTACLE DETECTED" : safetyStatus)
     : "SAFETY GUARD: ALL CLEAR";
   const stormActive = activeScenario === "STORM_INCOMING";
+  const isOrchard = telemetry?.is_orchard || currentField?.crop_type?.includes("APPLE") || currentField?.crop_type?.includes("GRAPE");
 
   return (
     <header className="glass-panel" style={{ margin: "12px 18px 0 18px", padding: "12px 20px" }}>
@@ -54,6 +56,9 @@ export function Header({
               <span className="badge badge-emerald" style={{ fontSize: "0.65rem" }}>
                 <Zap size={11} /> 5-Agent Fleet Core
               </span>
+              <span className="badge badge-cyan" style={{ fontSize: "0.65rem" }}>
+                {isOrchard ? "🍎 ORCHARD ROBOTIC PICKER" : "🌾 BROADACRE COMBINE FLEET"}
+              </span>
             </div>
             <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", margin: 0 }}>
               Autonomous Precision Agronomy & Cyber-Physical Harvester Fleet
@@ -61,10 +66,10 @@ export function Header({
           </div>
         </div>
 
-        {/* Field Selector Dropdown */}
+        {/* Field Selector & Drone Video Button */}
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 600 }}>
-            ACTIVE FIELD:
+            FIELD:
           </span>
           <select
             value={currentFieldId}
@@ -87,6 +92,20 @@ export function Header({
               </option>
             ))}
           </select>
+
+          {/* Drone Video AI Modal Trigger Button */}
+          <button
+            onClick={onOpenDroneModal}
+            className="btn btn-primary"
+            style={{
+              background: "linear-gradient(135deg, #06b6d4 0%, #0284c7 100%)",
+              boxShadow: "0 0 16px rgba(6, 182, 212, 0.35)",
+              fontSize: "0.8rem",
+              padding: "7px 12px"
+            }}
+          >
+            📹 Live Drone AI Vision
+          </button>
         </div>
 
         {/* Live Status Indicators */}
@@ -95,21 +114,29 @@ export function Header({
           {/* RTK Lock */}
           <div className="badge badge-cyan" title="Centimeter-level RTK GPS positioning lock">
             <Satellite size={13} />
-            <span>RTK FIX: {telemetry?.rtk_drift_mm ?? 14}mm DRIFT</span>
+            <span>RTK: {telemetry?.rtk_drift_mm ?? 14}mm</span>
           </div>
 
           {/* Weather Status */}
           <div className={`badge ${stormActive ? "badge-red" : "badge-emerald"}`}>
             <CloudRain size={13} />
             <span>
-              {stormActive ? "STORM NOWCAST: ETA 4.5h" : "WEATHER: OPTIMAL (36h)"}
+              {stormActive ? "STORM: ETA 4.5h" : "WEATHER: CLEAR (36h)"}
             </span>
           </div>
 
-          {/* CBOT Commodity Price */}
+          {/* Commodity Price */}
           <div className="badge badge-amber">
             <TrendingUp size={13} />
-            <span>CBOT {currentField?.crop_type === "WHEAT_HARD_RED" ? "WHEAT: $6.42" : currentField?.crop_type === "CORN_YELLOW_DENT" ? "CORN: $4.85" : "SOY: $12.10"}</span>
+            <span>
+              {currentField?.crop_type === "APPLES_HONEYCRISP" 
+                ? "HONEYCRISP: $38.50/box" 
+                : currentField?.crop_type === "GRAPES_CABERNET"
+                ? "CABERNET: $2,850/ton"
+                : currentField?.crop_type === "WHEAT_HARD_RED"
+                ? "WHEAT: $6.42/bu"
+                : "CORN: $4.85/bu"}
+            </span>
           </div>
 
           {/* Safety Supervisor Interlock */}
