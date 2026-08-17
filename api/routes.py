@@ -11,12 +11,15 @@ from api.schemas import (
     FleetControlRequest,
     FieldPreset,
     VideoAnalysisRequest,
+    CopilotChatRequest,
 )
 from api.websocket_manager import ws_manager
 from engine.orchestrator import AutoHarvestOrchestrator
+from engine.copilot import AgriCopilotAgent
 
 router = APIRouter(prefix="/api/v1", tags=["AutoHarvest Core"])
 orchestrator = AutoHarvestOrchestrator()
+copilot_agent = AgriCopilotAgent()
 
 # Pre-configured demo fields
 FIELD_PRESETS: Dict[str, FieldPreset] = {
@@ -314,5 +317,23 @@ async def analyze_video(req: VideoAnalysisRequest):
         crop_type=req.crop_type or "APPLES_HONEYCRISP",
     )
     return result
+
+
+@router.post("/copilot-chat")
+async def copilot_chat(req: CopilotChatRequest):
+    """
+    AgriCopilot Multi-Agent Natural Language Assistant dialogue endpoint.
+    """
+    ctx = req.context or {}
+    # Inject live telemetry into context if not present
+    telemetry = ws_manager.get_telemetry_payload()
+    merged_ctx = {**telemetry, **ctx}
+    
+    res = copilot_agent.ask(
+        query=req.query,
+        context=merged_ctx
+    )
+    return res
+
 
 

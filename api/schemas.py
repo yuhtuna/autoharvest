@@ -108,3 +108,9 @@ class VideoAnalysisRequest(BaseModel):
     video_source: Optional[str] = "DRONE_ORCHARD_APPLE_POV"
     crop_type: Optional[str] = "APPLES_HONEYCRISP"
 
+
+class CopilotChatRequest(BaseModel):
+    query: str
+    context: Optional[Dict[str, Any]] = None
+
+

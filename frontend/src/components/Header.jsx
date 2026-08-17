@@ -1,5 +1,5 @@
 import React from "react";
-import { Sprout, Video } from "lucide-react";
+import { Sprout, Video, Bot, FileText } from "lucide-react";
 
 export function Header({
   fields = [],
@@ -7,6 +7,8 @@ export function Header({
   onSelectField,
   telemetry,
   onOpenDroneModal,
+  onOpenCopilotModal,
+  onOpenReportModal,
 }) {
   const currentField = fields.find((f) => f.id === currentFieldId) || fields[0];
   const isOrchard = telemetry?.is_orchard || currentField?.crop_type?.includes("APPLE") || currentField?.crop_type?.includes("GRAPE");
@@ -40,7 +42,7 @@ export function Header({
         </div>
       </div>
 
-      {/* Field Selector & Drone Feed Button */}
+      {/* Field Selector & Action Buttons */}
       <div className="top-nav-controls">
         <select
           value={currentFieldId}
@@ -54,10 +56,31 @@ export function Header({
           ))}
         </select>
 
+        {/* AgriCopilot AI Assistant Button */}
+        <button
+          onClick={onOpenCopilotModal}
+          className="btn-dock btn-dock-secondary"
+          style={{ padding: "7px 12px", fontSize: "0.78rem", borderRadius: "8px", border: "1px solid rgba(56, 189, 248, 0.3)", color: "#38bdf8" }}
+        >
+          <Bot size={14} />
+          <span>Ask AgriCopilot</span>
+        </button>
+
+        {/* Executive Mission Report Button */}
+        <button
+          onClick={onOpenReportModal}
+          className="btn-dock btn-dock-secondary"
+          style={{ padding: "7px 12px", fontSize: "0.78rem", borderRadius: "8px", border: "1px solid rgba(16, 185, 129, 0.3)", color: "#34d399" }}
+        >
+          <FileText size={14} />
+          <span>Mission Report</span>
+        </button>
+
+        {/* Drone Video Feed Button */}
         <button
           onClick={onOpenDroneModal}
           className="btn-dock btn-dock-primary"
-          style={{ padding: "7px 14px", fontSize: "0.8rem", borderRadius: "8px" }}
+          style={{ padding: "7px 12px", fontSize: "0.78rem", borderRadius: "8px" }}
         >
           <Video size={14} />
           <span>Live Drone Feed</span>

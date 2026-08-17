@@ -75,3 +75,17 @@ export async function analyzeVideo(videoSource, cropType) {
   return res.json();
 }
 
+export async function sendCopilotQuery(query, context = {}) {
+  const res = await fetch(`${API_BASE}/copilot-chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      query,
+      context,
+    }),
+  });
+  if (!res.ok) throw new Error("Copilot chat failed");
+  return res.json();
+}
+
+
