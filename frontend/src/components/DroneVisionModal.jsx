@@ -15,9 +15,12 @@ import {
   Video as VideoIcon,
   ChevronRight,
   ShieldAlert,
-  Compass
+  Compass,
+  Bot,
+  Activity
 } from "lucide-react";
 import { fetchVideoSamples, analyzeImage, analyzeVideo } from "../services/api";
+
 
 export function DroneVisionModal({ isOpen, onClose, currentCropType, onOpenCopilotWithContext }) {
   const [activeTab, setActiveTab] = useState("IMAGE_LAB"); // 'IMAGE_LAB' | 'VIDEO_STREAM'
@@ -593,6 +596,82 @@ export function DroneVisionModal({ isOpen, onClose, currentCropType, onOpenCopil
               </div>
             </div>
 
+            {/* Bedrock Multimodal Agronomy Diagnostic Panel */}
+            {imageAnalysis?.multimodal_diagnosis && (
+              <div 
+                className="glass-panel" 
+                style={{ 
+                  padding: "10px 12px", 
+                  background: "rgba(15, 23, 42, 0.85)", 
+                  border: "1px solid rgba(56, 189, 248, 0.3)",
+                  borderRadius: "8px",
+                  fontSize: "0.7rem"
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                  <span style={{ fontWeight: 800, color: "#38bdf8", display: "flex", alignItems: "center", gap: "5px" }}>
+                    <Sparkles size={12} />
+                    MULTIMODAL AGRONOMY DIAGNOSTIC
+                  </span>
+                  <span 
+                    style={{ 
+                      fontSize: "0.62rem", 
+                      padding: "1px 5px", 
+                      borderRadius: "4px", 
+                      fontWeight: 700,
+                      background: imageAnalysis.multimodal_diagnosis.mode === "AWS_BEDROCK_MULTIMODAL_LIVE" ? "rgba(16, 185, 129, 0.2)" : "rgba(6, 182, 212, 0.15)",
+                      color: imageAnalysis.multimodal_diagnosis.mode === "AWS_BEDROCK_MULTIMODAL_LIVE" ? "#34d399" : "#38bdf8",
+                    }}
+                  >
+                    {imageAnalysis.multimodal_diagnosis.mode === "AWS_BEDROCK_MULTIMODAL_LIVE" ? "⚡ Bedrock Claude Vision" : "🌿 Hybrid Vision Core"}
+                  </span>
+                </div>
+
+                <div style={{ color: "#e2e8f0", fontSize: "0.68rem", lineHeight: 1.4, marginBottom: "8px" }}>
+                  {imageAnalysis.multimodal_diagnosis.executive_summary}
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "8px" }}>
+                  <div style={{ background: "rgba(17, 24, 39, 0.6)", padding: "5px 8px", borderRadius: "5px", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <div style={{ color: "var(--text-muted)", fontSize: "0.62rem" }}>Canopy Vigor</div>
+                    <div style={{ fontWeight: 700, color: "#34d399" }}>
+                      {imageAnalysis.multimodal_diagnosis.canopy_vigor?.rating || "OPTIMAL"}
+                    </div>
+                  </div>
+
+                  <div style={{ background: "rgba(17, 24, 39, 0.6)", padding: "5px 8px", borderRadius: "5px", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <div style={{ color: "var(--text-muted)", fontSize: "0.62rem" }}>Pathogen Risk</div>
+                    <div style={{ fontWeight: 700, color: (imageAnalysis.multimodal_diagnosis.pathogen_diagnosis?.risk_pct || 0) > 15 ? "#f87171" : "#38bdf8" }}>
+                      {imageAnalysis.multimodal_diagnosis.pathogen_diagnosis?.risk_pct || 5}% Risk
+                    </div>
+                  </div>
+                </div>
+
+                {onOpenCopilotWithContext && (
+                  <button
+                    onClick={() => onOpenCopilotWithContext({
+                      mean_sugar_brix: activeData?.mean_sugar_brix,
+                      ripe_pct: activeData?.harvestability_pct,
+                      scan_summary: imageAnalysis.multimodal_diagnosis.executive_summary,
+                    })}
+                    className="speed-pill"
+                    style={{ 
+                      width: "100%", 
+                      justifyContent: "center", 
+                      fontSize: "0.68rem", 
+                      padding: "5px 8px",
+                      background: "rgba(56, 189, 248, 0.12)",
+                      color: "#38bdf8",
+                      border: "1px solid rgba(56, 189, 248, 0.3)"
+                    }}
+                  >
+                    <Bot size={12} style={{ marginRight: "4px" }} />
+                    Ask AgriCopilot to Plan Harvest Window
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* Pathogen / Blight Alert */}
             {imageAnalysis?.blight_risk_detected && imageAnalysis?.blight_alerts?.[0] && (
               <div 
@@ -613,6 +692,7 @@ export function DroneVisionModal({ isOpen, onClose, currentCropType, onOpenCopil
                 </p>
               </div>
             )}
+
 
             {/* Interactive Detected Fruits List */}
             <div className="glass-panel" style={{ padding: "10px 12px", background: "rgba(10, 16, 26, 0.85)", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>

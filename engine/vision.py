@@ -408,9 +408,57 @@ class CropVisionAgent:
             directive = f"DELAY HARVEST: Crop is currently developing (Mean {mean_brix}Bx). Re-scan in 4-6 days."
             action_code = "HOLD_AND_MONITOR"
 
+        # Run Bedrock Multimodal Vision Analysis (or local agronomy diagnostic engine)
+        multimodal_diagnosis = None
+        try:
+            from engine.multimodal import BedrockMultimodalVisionAgent
+            multimodal_agent = BedrockMultimodalVisionAgent()
+
+            yolo_summary = {
+                "total_objects": total_count,
+                "mean_brix": mean_brix,
+                "ripe_pct": ripe_pct,
+                "ripe_count": ripe_count,
+            }
+
+            if decoded_cv_img is not None:
+                # Re-encode as JPEG bytes for Bedrock vision ingestion
+                success, buffer = cv2.imencode(".jpg", decoded_cv_img)
+                if success:
+                    multimodal_diagnosis = multimodal_agent.analyze_crop_image(
+                        image_bytes=buffer.tobytes(),
+                        media_type="image/jpeg",
+                        crop_type=crop_type,
+                        yolo_summary=yolo_summary,
+                    )
+            else:
+                # Use preset agronomic evaluation
+                multimodal_diagnosis = multimodal_agent._local_agronomy_fallback(
+                    crop_type=crop_type,
+                    yolo_summary=yolo_summary,
+                )
+
+            # Update blight alerts if Bedrock vision diagnosed high pathogen risk
+            if multimodal_diagnosis and detect_blight:
+                diag_pathogen = multimodal_diagnosis.get("pathogen_diagnosis", {})
+                if diag_pathogen and diag_pathogen.get("risk_pct", 0) >= 10:
+                    blight_alerts = [{
+                        "id": "PATHOGEN_MULTIMODAL_01",
+                        "disease_name": diag_pathogen.get("strain", "Localized Foliar Infection"),
+                        "severity": diag_pathogen.get("severity", "LOW_ISOLATED"),
+                        "affected_location": "Canopy Sunlit Quadrant",
+                        "urgency": "MONITOR_OR_SELECTIVE_PRUNE",
+                        "prevention_directive": diag_pathogen.get("recommendation", "Apply bio-fungicide within 48h.")
+                    }]
+
+        except Exception as e:
+            print(f"[CropVision] Multimodal vision analysis error: {e}")
+
         return {
             "status": "IMAGE_DIAGNOSTIC_COMPLETE",
             "detection_mode": detection_mode,
+            "vision_pipeline": "YOLO_V8_SPATIAL_PLUS_BEDROCK_MULTIMODAL" if detection_mode == "YOLO_V8_REAL_INFERENCE" else "HYBRID_AGRONOMY_DIAGNOSTIC",
+            "multimodal_diagnosis": multimodal_diagnosis,
             "preset_id": preset_id,
             "crop_type": crop_type,
             "total_objects_detected": total_count,
@@ -424,6 +472,7 @@ class CropVisionAgent:
             "action_code": action_code,
             "confidence_score": round(float(np.mean([d.get("confidence", 0.5) for d in detections])), 3)
         }
+
 
 
     def _generate_preset_detections(self, preset_id: str, crop_type: str) -> List[Dict[str, Any]]:
