@@ -358,28 +358,17 @@ export function FieldMap2D({
   }, [fieldPreset, missionPlan, telemetry, activeObstacle, activeScenario, showNDVI, showTrajectories, showHeadlands, showCutTrail, zoom]);
 
   return (
-    <div className="glass-panel" style={{ display: "flex", flexDirection: "column", height: "100%", position: "relative", overflow: "hidden", borderRadius: "14px 14px 0 0", borderBottom: "none" }}>
+    <div className="map-panel" style={{ height: "100%", flex: 1 }}>
       
-      {/* Top Map HUD Toolbar */}
-      <div 
-        style={{ 
-          padding: "10px 16px", 
-          borderBottom: "1px solid var(--border-color)", 
-          display: "flex", 
-          alignItems: "center", 
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: "8px",
-          zIndex: 10
-        }}
-      >
+      {/* Top Map Toolbar */}
+      <div className="map-header-bar">
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <Crosshair size={16} color="var(--color-emerald)" />
-          <span style={{ fontSize: "0.85rem", fontWeight: 700, letterSpacing: "0.02em" }}>
-            DIGITAL TWIN FIELD SATELLITE RADAR
+          <Crosshair size={15} color="var(--color-brand)" />
+          <span style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-main)" }}>
+            Field Radar & Digital Twin
           </span>
-          <span className="mono" style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-            ({fieldPreset?.area_hectares} ha • 64x64 Multispectral Tile)
+          <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+            ({fieldPreset?.area_hectares} ha • {fieldPreset?.name})
           </span>
         </div>
 
@@ -387,22 +376,19 @@ export function FieldMap2D({
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <button
             onClick={() => setShowNDVI(!showNDVI)}
-            className={`btn btn-secondary ${showNDVI ? "active" : ""}`}
-            style={{ fontSize: "0.75rem", padding: "4px 8px" }}
+            className={`speed-pill ${showNDVI ? "active" : ""}`}
           >
             NDVI Heatmap
           </button>
           <button
             onClick={() => setShowTrajectories(!showTrajectories)}
-            className={`btn btn-secondary ${showTrajectories ? "active" : ""}`}
-            style={{ fontSize: "0.75rem", padding: "4px 8px" }}
+            className={`speed-pill ${showTrajectories ? "active" : ""}`}
           >
-            Dubins Swaths
+            Swaths
           </button>
           <button
             onClick={() => setShowHeadlands(!showHeadlands)}
-            className={`btn btn-secondary ${showHeadlands ? "active" : ""}`}
-            style={{ fontSize: "0.75rem", padding: "4px 8px" }}
+            className={`speed-pill ${showHeadlands ? "active" : ""}`}
           >
             Headlands
           </button>
@@ -410,33 +396,30 @@ export function FieldMap2D({
           {/* Zoom Buttons */}
           <button
             onClick={() => setZoom((z) => Math.min(2.5, z + 0.2))}
-            className="btn btn-secondary"
-            style={{ padding: "4px 8px" }}
+            className="speed-pill"
             title="Zoom In"
           >
-            <ZoomIn size={14} />
+            <ZoomIn size={12} />
           </button>
           <button
             onClick={() => setZoom((z) => Math.max(0.6, z - 0.2))}
-            className="btn btn-secondary"
-            style={{ padding: "4px 8px" }}
+            className="speed-pill"
             title="Zoom Out"
           >
-            <ZoomOut size={14} />
+            <ZoomOut size={12} />
           </button>
           <button
             onClick={() => setZoom(1.0)}
-            className="btn btn-secondary"
-            style={{ padding: "4px 8px" }}
+            className="speed-pill"
             title="Reset Zoom"
           >
-            <RefreshCw size={14} />
+            <RefreshCw size={12} />
           </button>
         </div>
       </div>
 
       {/* Interactive Canvas Container */}
-      <div style={{ flex: 1, position: "relative", minHeight: "360px" }}>
+      <div style={{ flex: 1, position: "relative", minHeight: "360px", background: "#060911" }}>
         <canvas
           ref={canvasRef}
           style={{ width: "100%", height: "100%", display: "block" }}

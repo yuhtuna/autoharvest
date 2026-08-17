@@ -3,9 +3,8 @@ import confetti from "canvas-confetti";
 
 import { Header } from "./components/Header";
 import { FieldMap2D } from "./components/FieldMap2D";
-import { Sidebar } from "./components/Sidebar";
-import { BottomDrawer } from "./components/BottomDrawer";
-import { StatusBar } from "./components/StatusBar";
+import { FloatingControlDock } from "./components/FloatingControlDock";
+import { CleanTelemetrySidebar } from "./components/CleanTelemetrySidebar";
 import { DroneVisionModal } from "./components/DroneVisionModal";
 
 import { fetchFields, scanField, triggerScenario, sendFleetControl } from "./services/api";
@@ -21,10 +20,6 @@ export default function App() {
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isDroneModalOpen, setIsDroneModalOpen] = useState(false);
-  
-  // Bottom Drawer state
-  const [drawerTab, setDrawerTab] = useState("AGENTS");
-  const [isDrawerExpanded, setIsDrawerExpanded] = useState(false);
 
   const hasCelebratedRef = useRef(false);
 
@@ -158,17 +153,12 @@ export default function App() {
     }
   };
 
-  const handleOpenDrawerTab = (tabName) => {
-    setDrawerTab(tabName);
-    setIsDrawerExpanded(true);
-  };
-
   const currentFieldPreset = fields.find((f) => f.id === currentFieldId) || fields[0];
 
   return (
     <div className="app-container">
       
-      {/* 1. Minimal Top Header */}
+      {/* 1. Minimal Top Navigation Bar */}
       <Header
         fields={fields}
         currentFieldId={currentFieldId}
@@ -177,56 +167,40 @@ export default function App() {
         onOpenDroneModal={() => setIsDroneModalOpen(true)}
       />
 
-      {/* 2. Main 2-Column Grid (Map 70% + Sidebar 30%) */}
-      <main className="main-grid">
+      {/* 2. Main 2-Column Dashboard Grid */}
+      <main className="dashboard-grid">
         
-        {/* Left Area: Digital Twin Map + Collapsible Bottom Drawer */}
-        <section className="map-area">
-          
-          <div className="map-canvas-wrapper">
-            <FieldMap2D
-              fieldPreset={currentFieldPreset}
-              missionPlan={missionPlan}
-              telemetry={telemetry}
-              activeObstacle={activeObstacle}
-              activeScenario={activeScenario}
-            />
-          </div>
-
-          <BottomDrawer
-            activeTab={drawerTab}
-            onSelectTab={setDrawerTab}
-            isExpanded={isDrawerExpanded}
-            onToggleExpand={() => setIsDrawerExpanded(!isDrawerExpanded)}
+        {/* Left: Map Panel with Integrated Floating Control Dock */}
+        <div style={{ position: "relative", height: "100%", minHeight: 0 }}>
+          <FieldMap2D
+            fieldPreset={currentFieldPreset}
             missionPlan={missionPlan}
+            telemetry={telemetry}
+            activeObstacle={activeObstacle}
             activeScenario={activeScenario}
-            onTriggerScenario={handleTriggerScenario}
-            cropType={currentFieldPreset?.crop_type}
           />
 
-        </section>
+          {/* Floating Control Dock (Apple/Tesla transport bar) */}
+          <FloatingControlDock
+            isSimulationRunning={isSimulationRunning}
+            isPaused={isPaused}
+            telemetry={telemetry}
+            onControlFleet={handleControlFleet}
+          />
+        </div>
 
-        {/* Right Area: Unified Mission Sidebar */}
-        <Sidebar
+        {/* Right: Clean Telemetry Sidebar (No flashing dials) */}
+        <CleanTelemetrySidebar
           telemetry={telemetry}
           missionPlan={missionPlan}
-          isSimulationRunning={isSimulationRunning}
-          isPaused={isPaused}
-          onControlFleet={handleControlFleet}
-          onOpenDrawerTab={handleOpenDrawerTab}
+          currentFieldPreset={currentFieldPreset}
+          activeScenario={activeScenario}
+          onTriggerScenario={handleTriggerScenario}
         />
 
       </main>
 
-      {/* 3. Slim Bottom Status Bar */}
-      <StatusBar
-        telemetry={telemetry}
-        missionPlan={missionPlan}
-        currentFieldPreset={currentFieldPreset}
-        activeScenario={activeScenario}
-      />
-
-      {/* 4. Drone Aerial POV & AI Computer Vision Modal */}
+      {/* 3. Drone Aerial POV & AI Computer Vision Modal */}
       <DroneVisionModal
         isOpen={isDroneModalOpen}
         onClose={() => setIsDroneModalOpen(false)}

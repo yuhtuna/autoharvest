@@ -1,5 +1,5 @@
 import React from "react";
-import { Sprout, Zap, Video } from "lucide-react";
+import { Sprout, Video } from "lucide-react";
 
 export function Header({
   fields = [],
@@ -12,94 +12,58 @@ export function Header({
   const isOrchard = telemetry?.is_orchard || currentField?.crop_type?.includes("APPLE") || currentField?.crop_type?.includes("GRAPE");
 
   return (
-    <header 
-      className="glass-panel" 
-      style={{ 
-        margin: "10px 16px 0 16px", 
-        padding: "10px 18px", 
-        borderRadius: "14px",
-        flexShrink: 0 
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
-        
-        {/* Logo & Platform Title */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div 
-            style={{ 
-              width: "38px", 
-              height: "38px", 
-              borderRadius: "10px", 
-              background: "linear-gradient(135deg, #10b981 0%, #047857 100%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 0 16px rgba(16, 185, 129, 0.35)"
-            }}
-          >
-            <Sprout size={22} color="#ffffff" />
-          </div>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <h1 style={{ fontSize: "1.15rem", color: "#f9fafb", margin: 0, fontWeight: 800, letterSpacing: "-0.01em" }}>
-                AUTOHARVEST
-              </h1>
-              <span className="badge badge-emerald" style={{ fontSize: "0.62rem" }}>
-                <Zap size={10} /> 5-Agent Fleet Core
-              </span>
-              <span className="badge badge-cyan" style={{ fontSize: "0.62rem" }}>
-                {isOrchard ? "🍎 ORCHARD ROBOTIC PICKER" : "🌾 COMBINE HARVESTER"}
-              </span>
-            </div>
-            <p style={{ fontSize: "0.72rem", color: "var(--text-secondary)", margin: 0 }}>
-              Autonomous Precision Agronomy & Cyber-Physical Multi-Agent Fleet
-            </p>
-          </div>
+    <header className="top-nav">
+      
+      {/* Brand & Mode */}
+      <div className="top-nav-brand">
+        <div className="top-nav-logo">
+          <Sprout size={20} />
         </div>
-
-        {/* Field Selector & Drone Video Button */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span style={{ fontSize: "0.78rem", color: "var(--text-muted)", fontWeight: 700 }}>
-            FIELD PARCEL:
-          </span>
-          <select
-            value={currentFieldId}
-            onChange={(e) => onSelectField(e.target.value)}
-            style={{
-              background: "rgba(17, 24, 39, 0.9)",
-              color: "#f3f4f6",
-              border: "1px solid var(--border-color)",
-              padding: "7px 12px",
-              borderRadius: "8px",
-              fontSize: "0.82rem",
-              fontWeight: 600,
-              cursor: "pointer",
-              outline: "none"
-            }}
-          >
-            {fields.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name} ({f.crop_display_name})
-              </option>
-            ))}
-          </select>
-
-          {/* Drone Video AI Modal Trigger Button */}
-          <button
-            onClick={onOpenDroneModal}
-            className="btn btn-primary"
-            style={{
-              background: "linear-gradient(135deg, #06b6d4 0%, #0284c7 100%)",
-              boxShadow: "0 0 16px rgba(6, 182, 212, 0.35)",
-              fontSize: "0.78rem",
-              padding: "7px 12px"
-            }}
-          >
-            <Video size={14} /> Live Drone AI Vision
-          </button>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span className="top-nav-title">AutoHarvest Fleet OS</span>
+            <span 
+              style={{ 
+                fontSize: "0.68rem", 
+                fontWeight: 600, 
+                padding: "2px 8px", 
+                borderRadius: "9999px",
+                background: isOrchard ? "rgba(56, 189, 248, 0.12)" : "rgba(16, 185, 129, 0.12)",
+                color: isOrchard ? "#38bdf8" : "#34d399",
+                border: isOrchard ? "1px solid rgba(56, 189, 248, 0.25)" : "1px solid rgba(16, 185, 129, 0.25)"
+              }}
+            >
+              {isOrchard ? "🍎 Orchard Picker Mode" : "🌾 Combine Fleet Mode"}
+            </span>
+          </div>
+          <div className="top-nav-subtitle">Autonomous Precision Agronomy & Multi-Agent Robotics</div>
         </div>
-
       </div>
+
+      {/* Field Selector & Drone Feed Button */}
+      <div className="top-nav-controls">
+        <select
+          value={currentFieldId}
+          onChange={(e) => onSelectField(e.target.value)}
+          className="field-select"
+        >
+          {fields.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.name} — {f.crop_display_name}
+            </option>
+          ))}
+        </select>
+
+        <button
+          onClick={onOpenDroneModal}
+          className="btn-dock btn-dock-primary"
+          style={{ padding: "7px 14px", fontSize: "0.8rem", borderRadius: "8px" }}
+        >
+          <Video size={14} />
+          <span>Live Drone Feed</span>
+        </button>
+      </div>
+
     </header>
   );
 }
