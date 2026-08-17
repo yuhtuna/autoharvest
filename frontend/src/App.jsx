@@ -213,6 +213,10 @@ export default function App() {
         isOpen={isDroneModalOpen}
         onClose={() => setIsDroneModalOpen(false)}
         currentCropType={currentFieldPreset?.crop_type}
+        onOpenCopilotWithContext={(ctx) => {
+          setIsDroneModalOpen(false);
+          setIsCopilotOpen(true);
+        }}
       />
 
       {/* 4. AgriCopilot Multi-Agent Natural Language Assistant */}
@@ -233,6 +237,7 @@ export default function App() {
         missionPlan={missionPlan}
         currentFieldPreset={currentFieldPreset}
       />
+
 
     </div>
   );

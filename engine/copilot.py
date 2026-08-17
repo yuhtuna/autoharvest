@@ -102,14 +102,24 @@ class AgriCopilotAgent:
                 "• **Compliance Standard**: ISO 14064-2 verified precision robotics."
             )
 
-        # 5. Ripeness / Sugar Brix / Fruit queries
-        elif any(w in q for w in ["brix", "ripe", "sugar", "fruit", "apple", "grape", "ndvi"]):
-            if isOrchard:
+        # 5. Ripeness / Sugar Brix / Fruit / Scan queries
+        elif any(w in q for w in ["scan", "brix", "ripe", "sugar", "fruit", "apple", "grape", "orange", "citrus", "blight", "disease", "fungal", "pathogen"]):
+            if any(w in q for w in ["blight", "disease", "fungal", "pathogen"]):
                 answer = (
-                    "🍎 **CropVision Optical Brix Ripeness Analysis:**\n\n"
-                    "• **Mean Sugar Brix**: **14.8°Bx** (Grade: Prime Dessert Quality)\n"
-                    "• **Harvestable Ratio**: 89.5% of canopy clusters meet optical maturity\n"
-                    "• **Robotic Delta Arms**: 4x soft-touch suction grippers active at 48 CPM."
+                    "🦠 **CropVision Agronomy Pathogen Diagnostic:**\n\n"
+                    "• **Identified Strain**: *Venturia Inaequalis (Apple Scab / Early Blight)*\n"
+                    "• **Affected Area**: 2.4% localized canopy area (Sector B)\n"
+                    "• **Recommended Action**: Prioritize harvesting ripe clusters immediately. Apply organic bio-fungicide within 48 hours to prevent spore transmission to adjacent tree rows."
+                )
+            elif is_orchard or any(w in q for w in ["apple", "grape", "orange", "citrus"]):
+                brix_val = context.get("mean_sugar_brix", 14.8)
+                ripe_val = context.get("ripe_pct", 89.5)
+                answer = (
+                    f"🍎 **CropVision Optical Ripeness & Harvest Directive:**\n\n"
+                    f"• **Mean Sugar Brix**: **{brix_val}°Bx** (Grade: Peak Dessert Sugar)\n"
+                    f"• **Maturity Ratio**: **{ripe_val}% of detected fruits** are at optimal maturity.\n"
+                    "• **Harvest Strategy**: **DISPATCH ROBOTIC PICKING CREW**.\n"
+                    "• **Autonomous Routing**: Delta arms target high-Brix clusters first, leaving green developing fruits for a secondary pass in 5 days."
                 )
             else:
                 answer = (
@@ -120,6 +130,7 @@ class AgriCopilotAgent:
                 )
 
         # 6. Swarm / Grain Cart queries
+
         elif any(w in q for w in ["cart", "swarm", "unload", "tractor", "chaser"]):
             answer = (
                 "🚜 **Multi-Vehicle Swarm Coordination (Autonomous Chaser Bin):**\n\n"

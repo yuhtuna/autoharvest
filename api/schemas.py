@@ -107,10 +107,19 @@ class FieldPreset(BaseModel):
 class VideoAnalysisRequest(BaseModel):
     video_source: Optional[str] = "DRONE_ORCHARD_APPLE_POV"
     crop_type: Optional[str] = "APPLES_HONEYCRISP"
+    image_data: Optional[str] = None
+
+
+class ImageAnalysisRequest(BaseModel):
+    image_data: Optional[str] = None  # Base64 encoded image string or preset ID
+    preset_id: Optional[str] = "HONEYCRISP_ORCHARD"
+    crop_type: Optional[str] = "APPLES_HONEYCRISP"
+    detect_blight: Optional[bool] = True
 
 
 class CopilotChatRequest(BaseModel):
     query: str
     context: Optional[Dict[str, Any]] = None
+
 
 

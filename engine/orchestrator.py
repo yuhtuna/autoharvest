@@ -223,3 +223,21 @@ class AutoHarvestOrchestrator:
             video_path_or_preset=video_source,
             crop_type=crop_type,
         )
+
+    def process_crop_image(
+        self,
+        image_data: Optional[str] = None,
+        preset_id: str = "HONEYCRISP_ORCHARD",
+        crop_type: str = "APPLES_HONEYCRISP",
+        detect_blight: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Runs CropVision single-photo or drone frame computer vision diagnostic.
+        """
+        return self.crop_vision.analyze_custom_image(
+            image_data=image_data,
+            preset_id=preset_id,
+            crop_type=crop_type,
+            detect_blight=detect_blight,
+        )
+

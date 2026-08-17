@@ -75,6 +75,21 @@ export async function analyzeVideo(videoSource, cropType) {
   return res.json();
 }
 
+export async function analyzeImage({ imageData, presetId, cropType, detectBlight = true }) {
+  const res = await fetch(`${API_BASE}/analyze-image`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      image_data: imageData,
+      preset_id: presetId,
+      crop_type: cropType,
+      detect_blight: detectBlight,
+    }),
+  });
+  if (!res.ok) throw new Error("Image analysis failed");
+  return res.json();
+}
+
 export async function sendCopilotQuery(query, context = {}) {
   const res = await fetch(`${API_BASE}/copilot-chat`, {
     method: "POST",
@@ -87,5 +102,6 @@ export async function sendCopilotQuery(query, context = {}) {
   if (!res.ok) throw new Error("Copilot chat failed");
   return res.json();
 }
+
 
 

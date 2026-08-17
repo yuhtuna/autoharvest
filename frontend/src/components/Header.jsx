@@ -1,5 +1,5 @@
 import React from "react";
-import { Sprout, Video, Bot, FileText } from "lucide-react";
+import { Sprout, Scan, Bot, FileText } from "lucide-react";
 
 export function Header({
   fields = [],
@@ -38,7 +38,7 @@ export function Header({
               {isOrchard ? "🍎 Orchard Picker Mode" : "🌾 Combine Fleet Mode"}
             </span>
           </div>
-          <div className="top-nav-subtitle">Autonomous Precision Agronomy & Multi-Agent Robotics</div>
+          <div className="top-nav-subtitle">Agents for Humans • AWS Multi-Agent Precision Agronomy</div>
         </div>
       </div>
 
@@ -55,6 +55,25 @@ export function Header({
             </option>
           ))}
         </select>
+
+        {/* Hero CTA: Scan & Grade Crops Diagnostic Lab */}
+        <button
+          onClick={onOpenDroneModal}
+          className="btn-dock btn-dock-primary"
+          style={{ 
+            padding: "7px 14px", 
+            fontSize: "0.78rem", 
+            borderRadius: "8px",
+            background: "linear-gradient(135deg, #0284c7, #06b6d4)",
+            color: "#ffffff",
+            fontWeight: 700,
+            border: "1px solid rgba(56, 189, 248, 0.4)",
+            boxShadow: "0 0 15px rgba(6, 182, 212, 0.3)"
+          }}
+        >
+          <Scan size={14} />
+          <span>Scan & Grade Crops</span>
+        </button>
 
         {/* AgriCopilot AI Assistant Button */}
         <button
@@ -75,18 +94,9 @@ export function Header({
           <FileText size={14} />
           <span>Mission Report</span>
         </button>
-
-        {/* Drone Video Feed Button */}
-        <button
-          onClick={onOpenDroneModal}
-          className="btn-dock btn-dock-primary"
-          style={{ padding: "7px 12px", fontSize: "0.78rem", borderRadius: "8px" }}
-        >
-          <Video size={14} />
-          <span>Live Drone Feed</span>
-        </button>
       </div>
 
     </header>
   );
 }
+

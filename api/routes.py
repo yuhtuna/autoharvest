@@ -11,6 +11,7 @@ from api.schemas import (
     FleetControlRequest,
     FieldPreset,
     VideoAnalysisRequest,
+    ImageAnalysisRequest,
     CopilotChatRequest,
 )
 from api.websocket_manager import ws_manager
@@ -278,33 +279,60 @@ def get_telemetry():
 def get_video_samples():
     return [
         {
-            "id": "DRONE_ORCHARD_APPLE_POV",
-            "title": "Yakima Orchard Aerial Drone Scan (Honeycrisp 4K)",
+            "id": "HONEYCRISP_ORCHARD",
+            "title": "Yakima Valley Honeycrisp Apple Canopy (4K UAV)",
             "crop_type": "APPLES_HONEYCRISP",
+            "category": "ORCHARD",
             "resolution": "3840x2160 (4K UHD)",
             "framerate": "60 fps",
             "altitude_m": 4.5,
-            "description": "Low-altitude autonomous UAV flight over Honeycrisp apple canopy. Target fruit Brix ripeness analysis."
+            "description": "Autonomous low-altitude UAV scan. Optical Brix grading & individual fruit picking coordinates."
         },
         {
-            "id": "DRONE_WHEAT_FIELD_SCAN",
-            "title": "Platte River Basin Wheat Headlands Scan",
-            "crop_type": "WHEAT_HARD_RED",
-            "resolution": "1920x1080 (FHD)",
-            "framerate": "30 fps",
-            "altitude_m": 12.0,
-            "description": "Multispectral canopy overview. Weed and fungal blight segmenter."
-        },
-        {
-            "id": "TRACTOR_POV_NAPA_GRAPES",
-            "title": "Napa Valley Trellis Harvester Front-Mount Camera",
+            "id": "CABERNET_VINEYARD",
+            "title": "Napa Valley Cabernet Sauvignon Trellis (FHD)",
             "crop_type": "GRAPES_CABERNET",
+            "category": "VINEYARD",
             "resolution": "1920x1080 (FHD)",
             "framerate": "60 fps",
             "altitude_m": 1.8,
-            "description": "Onboard ISOBUS tractor camera detecting grape cluster density and sugar Brix concentration."
+            "description": "High-sugar vintage cluster segmentation and selective harvester routing."
+        },
+        {
+            "id": "VALENCIA_GROVE",
+            "title": "Florida Valencia Orange Citrus Grove (4K)",
+            "crop_type": "CITRUS_VALENCIA",
+            "category": "CITRUS_GROVE",
+            "resolution": "3840x2160 (4K UHD)",
+            "framerate": "60 fps",
+            "altitude_m": 3.2,
+            "description": "Caliber sizing, ripeness color index, and canker pathogen screening."
+        },
+        {
+            "id": "NEBRASKA_WHEAT",
+            "title": "Platte River Basin Winter Wheat Headlands",
+            "crop_type": "WHEAT_HARD_RED",
+            "category": "BROADACRE_GRAIN",
+            "resolution": "1920x1080 (FHD)",
+            "framerate": "30 fps",
+            "altitude_m": 12.0,
+            "description": "Broadacre multispectral NDVI overview and weed/fungal blight hotspot detection."
         }
     ]
+
+
+@router.post("/analyze-image")
+async def analyze_image(req: ImageAnalysisRequest):
+    """
+    Runs CropVision AI single-image or uploaded photo computer vision diagnostic.
+    """
+    result = orchestrator.process_crop_image(
+        image_data=req.image_data,
+        preset_id=req.preset_id or "HONEYCRISP_ORCHARD",
+        crop_type=req.crop_type or "APPLES_HONEYCRISP",
+        detect_blight=req.detect_blight if req.detect_blight is not None else True,
+    )
+    return result
 
 
 @router.post("/analyze-video")
@@ -313,7 +341,7 @@ async def analyze_video(req: VideoAnalysisRequest):
     Runs CropVision AI frame-by-frame computer vision analysis on uploaded or sample video.
     """
     result = orchestrator.process_drone_video(
-        video_source=req.video_source or "DRONE_ORCHARD_APPLE_POV",
+        video_source=req.video_source or "HONEYCRISP_ORCHARD",
         crop_type=req.crop_type or "APPLES_HONEYCRISP",
     )
     return result
@@ -334,6 +362,7 @@ async def copilot_chat(req: CopilotChatRequest):
         context=merged_ctx
     )
     return res
+
 
 
 
