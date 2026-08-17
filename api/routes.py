@@ -142,6 +142,10 @@ async def simulate_scenario(req: SimulateScenarioRequest):
     obstacle_detected = (req.scenario_type == "OBSTACLE_DETECTED")
     market_spike = 0.18 if (req.scenario_type == "MARKET_SPIKE") else 0.0
     inject_blight = (req.scenario_type == "FUNGAL_BLIGHT")
+    
+    obs_coords = params.get("obstacle_coords") or (
+        [ws_manager.current_pos[0], ws_manager.current_pos[1]] if obstacle_detected else None
+    )
 
     # Re-run orchestrator with scenario condition
     plan = orchestrator.process_field_mission(
@@ -155,7 +159,7 @@ async def simulate_scenario(req: SimulateScenarioRequest):
         inject_blight=inject_blight,
         obstacle_detected=obstacle_detected,
         obstacle_type=params.get("obstacle_type", "HUMAN_IR_SIGNATURE"),
-        obstacle_coords=params.get("obstacle_coords"),
+        obstacle_coords=obs_coords,
         market_spike_override=market_spike,
     )
 

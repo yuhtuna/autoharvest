@@ -130,21 +130,22 @@ class WebSocketManager:
         params = params or {}
 
         if scenario_type == "OBSTACLE_DETECTED":
-            # Place obstacle near current heading
-            obs_lon = self.current_pos[0] + 0.0003
-            obs_lat = self.current_pos[1] - 0.0006
+            # Place obstacle directly at current harvester position to guarantee sub-50ms E-STOP trigger
+            obs_lon = self.current_pos[0]
+            obs_lat = self.current_pos[1]
+            obs_type = params.get("obstacle_type", "HUMAN_IR_SIGNATURE")
             self.active_obstacle = {
                 "id": "OBS_01",
-                "type": params.get("obstacle_type", "HUMAN_IR_SIGNATURE"),
+                "type": obs_type,
                 "lon": obs_lon,
                 "lat": obs_lat,
-                "radius_m": 12.0,
+                "radius_m": 15.0,
             }
             self.e_stop_active = True
-            self.safety_alert = f"ESTOP_TRIGGERED_{self.active_obstacle['type']}"
+            self.safety_alert = f"ESTOP_TRIGGERED_{obs_type}"
             self.speed_kmh = 0.0
             self.engine_rpm = 950
-            self.cutter_height_cm = 45.0  # retracted
+            self.cutter_height_cm = 45.0  # Retract cutter bar
 
         elif scenario_type == "STORM_INCOMING":
             self.active_obstacle = None

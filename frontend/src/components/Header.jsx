@@ -19,7 +19,11 @@ export function Header({
   missionPlan,
 }) {
   const currentField = fields.find((f) => f.id === currentFieldId) || fields[0];
-  const eStop = telemetry?.e_stop_active || false;
+  const safetyStatus = telemetry?.safety_status || missionPlan?.safety_status || "GEOFENCE_ACTIVE_ALL_CLEAR";
+  const eStop = telemetry?.e_stop_active || safetyStatus.includes("ESTOP") || safetyStatus.includes("WARNING") || safetyStatus.includes("BREACH");
+  const safetyText = eStop 
+    ? (safetyStatus.includes("ESTOP") ? "E-STOP: OBSTACLE DETECTED" : safetyStatus)
+    : "SAFETY GUARD: ALL CLEAR";
   const stormActive = activeScenario === "STORM_INCOMING";
 
   return (
@@ -111,7 +115,7 @@ export function Header({
           {/* Safety Supervisor Interlock */}
           <div className={`badge ${eStop ? "badge-red" : "badge-emerald"}`}>
             {eStop ? <ShieldAlert size={13} /> : <Radio size={13} />}
-            <span>{eStop ? "E-STOP ACTIVE" : "SAFETY GUARD: ALL CLEAR"}</span>
+            <span>{safetyText}</span>
           </div>
 
         </div>

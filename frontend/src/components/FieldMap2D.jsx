@@ -203,27 +203,42 @@ export function FieldMap2D({
     if (activeObstacle) {
       const ox = toCanvasX(activeObstacle.lon);
       const oy = toCanvasY(activeObstacle.lat);
-      const obsRadiusPx = Math.max(16, 22 * zoom);
+      const obsRadiusPx = Math.max(22, 28 * zoom);
 
-      // Hazard pulsing radar circle
-      ctx.fillStyle = "rgba(239, 68, 68, 0.3)";
+      // Outer Pulsing Danger Warning Zone
+      ctx.fillStyle = "rgba(239, 68, 68, 0.35)";
       ctx.strokeStyle = "#ef4444";
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 3.0;
       ctx.beginPath();
       ctx.arc(ox, oy, obsRadiusPx, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
-      // Inner danger dot
+      // Middle Safety Buffer Ring (15m perimeter)
+      ctx.strokeStyle = "rgba(254, 202, 202, 0.75)";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.arc(ox, oy, obsRadiusPx * 1.6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Inner Danger Icon Core
       ctx.fillStyle = "#ffffff";
       ctx.beginPath();
-      ctx.arc(ox, oy, 5, 0, Math.PI * 2);
+      ctx.arc(ox, oy, 7, 0, Math.PI * 2);
       ctx.fill();
 
-      // Label
-      ctx.fillStyle = "#fecaca";
+      // Bold Floating Label Banner
+      ctx.fillStyle = "rgba(185, 28, 28, 0.9)";
+      ctx.fillRect(ox + obsRadiusPx + 4, oy - 14, 180, 24);
+      ctx.strokeStyle = "#fca5a5";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(ox + obsRadiusPx + 4, oy - 14, 180, 24);
+
+      ctx.fillStyle = "#ffffff";
       ctx.font = "bold 11px JetBrains Mono, monospace";
-      ctx.fillText(`🛑 ${activeObstacle.type}`, ox + obsRadiusPx + 6, oy + 4);
+      ctx.fillText(`🛑 ${activeObstacle.type}`, ox + obsRadiusPx + 10, oy + 2);
     }
 
     // 8. Draw Live Autonomous Harvester Unit
