@@ -3,10 +3,14 @@ AutoHarvest FastAPI Server Main Application
 """
 import asyncio
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
+load_dotenv()
+
 from api.routes import router as api_router, FIELD_PRESETS
+
 from api.websocket_manager import ws_manager
 from engine.orchestrator import AutoHarvestOrchestrator
 

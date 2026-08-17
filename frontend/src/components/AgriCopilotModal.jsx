@@ -11,7 +11,7 @@ import {
   Fuel,
   Apple
 } from "lucide-react";
-import { sendCopilotQuery } from "../services/api";
+import { sendCopilotQuery, fetchBedrockStatus } from "../services/api";
 
 const PRESET_PROMPTS = [
   "Plan selective picking for ripe clusters",
@@ -34,12 +34,28 @@ export function AgriCopilotModal({
   const [messages, setMessages] = useState([
     {
       sender: "COPILOT",
-      text: "👋 **Hello! I'm AgriCopilot**, your multi-agent agronomy assistant powered by AWS Bedrock. I synthesize real-time crop scans, kinematics Dubins paths, weather nowcasts, CBOT futures, and safety interlocks. What would you like to plan or analyze?",
+      text: "👋 **Hello! I'm AgriCopilot**, your multi-agent agronomy assistant. I synthesize real-time crop scans, kinematics Dubins paths, weather nowcasts, CBOT futures, and safety interlocks. What would you like to plan or analyze?",
+      backend: "AWS Bedrock Claude / Multi-Agent Core",
     },
   ]);
   const [inputVal, setInputVal] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [bedrockStatus, setBedrockStatus] = useState(null);
   const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    async function loadStatus() {
+      try {
+        const res = await fetchBedrockStatus();
+        setBedrockStatus(res);
+      } catch (err) {
+        console.warn("Bedrock status check error:", err);
+      }
+    }
+    if (isOpen) {
+      loadStatus();
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -67,9 +83,13 @@ export function AgriCopilotModal({
         ...(initialContext || {}),
       };
 
-
       const res = await sendCopilotQuery(textToSend, context);
-      const botMsg = { sender: "COPILOT", text: res.response };
+      const botMsg = {
+        sender: "COPILOT",
+        text: res.response,
+        backend: res.llm_backend === "AWS_BEDROCK" ? `⚡ AWS Bedrock (${res.model_id?.split('.')[1] || 'Claude'})` : "🌿 Local Multi-Agent Agronomy Core",
+        isLiveLLM: res.llm_backend === "AWS_BEDROCK",
+      };
       setMessages((prev) => [...prev, botMsg]);
     } catch (err) {
       setMessages((prev) => [
@@ -135,14 +155,32 @@ export function AgriCopilotModal({
               <Bot size={18} />
             </div>
             <div>
-              <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--text-main)" }}>
-                AgriCopilot Fleet AI
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--text-main)" }}>
+                  AgriCopilot Fleet AI
+                </span>
+                <span
+                  style={{
+                    fontSize: "0.62rem",
+                    padding: "2px 6px",
+                    borderRadius: "4px",
+                    fontWeight: 700,
+                    background: bedrockStatus?.bedrock_available ? "rgba(16, 185, 129, 0.15)" : "rgba(56, 189, 248, 0.15)",
+                    color: bedrockStatus?.bedrock_available ? "#34d399" : "#38bdf8",
+                    border: bedrockStatus?.bedrock_available ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(56, 189, 248, 0.3)",
+                  }}
+                >
+                  {bedrockStatus?.bedrock_available ? "⚡ AWS Bedrock Live" : "🌿 Multi-Agent Core"}
+                </span>
               </div>
               <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
-                Connected to 5 Domain Autonomous Agents
+                {bedrockStatus?.bedrock_available
+                  ? `Active Model: ${bedrockStatus.active_model || 'Claude 3.5 Sonnet'}`
+                  : "Connected to 5 Domain Autonomous Agents (Bedrock Ready)"}
               </div>
             </div>
           </div>
+
 
           <button
             onClick={onClose}
@@ -213,23 +251,38 @@ export function AgriCopilotModal({
                 border: msg.sender === "USER" ? "none" : "1px solid var(--border-card)",
               }}
             >
+              {msg.backend && (
+                <div style={{ fontSize: "0.62rem", color: msg.isLiveLLM ? "#34d399" : "#38bdf8", fontWeight: 700, marginBottom: "6px", display: "flex", alignItems: "center", gap: "4px" }}>
+                  <Sparkles size={10} />
+                  <span>{msg.backend}</span>
+                </div>
+              )}
               <div style={{ whiteSpace: "pre-wrap" }}>
                 {msg.text.split("\n").map((line, lIdx) => {
-                  // Format bold tags
-                  const formattedLine = line.replace(/\*\*(.*?)\*\*/g, "$1");
+                  const isBullet = line.trim().startsWith("•") || line.trim().startsWith("*");
+                  const cleanText = line.replace(/^\s*[•*]\s*/, "");
+                  
+                  // Render bold elements within lines
+                  const parts = cleanText.split(/(\*\*.*?\*\*)/g);
+
                   return (
-                    <div key={lIdx} style={{ marginBottom: line.trim() ? "3px" : "8px" }}>
-                      {line.startsWith("•") ? (
-                        <span style={{ paddingLeft: "4px" }}>{line}</span>
-                      ) : (
-                        <span>{line.replace(/\*\*/g, "")}</span>
-                      )}
+                    <div key={lIdx} style={{ marginBottom: line.trim() ? "3px" : "8px", display: isBullet ? "flex" : "block", gap: "6px" }}>
+                      {isBullet && <span style={{ color: "#38bdf8", fontWeight: 700 }}>•</span>}
+                      <span>
+                        {parts.map((p, pIdx) => {
+                          if (p.startsWith("**") && p.endsWith("**")) {
+                            return <strong key={pIdx} style={{ color: "#ffffff", fontWeight: 700 }}>{p.slice(2, -2)}</strong>;
+                          }
+                          return p;
+                        })}
+                      </span>
                     </div>
                   );
                 })}
               </div>
             </div>
           ))}
+
 
           {isLoading && (
             <div

@@ -103,5 +103,12 @@ export async function sendCopilotQuery(query, context = {}) {
   return res.json();
 }
 
+export async function fetchBedrockStatus() {
+  const res = await fetch(`${API_BASE}/bedrock-status`);
+  if (!res.ok) throw new Error("Failed to fetch Bedrock status");
+  return res.json();
+}
+
+
 
 

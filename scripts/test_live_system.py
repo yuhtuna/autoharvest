@@ -20,12 +20,13 @@ scan_res = requests.post(f"{BASE}/scan-field", json={
 dt = (time.time() - t0) * 1000
 print(f"Status Code: {scan_res.status_code} (Latency: {dt:.1f}ms)")
 data = scan_res.json()
-print(f"• Predicted Yield: {data['yield_prediction_bushels']} bu")
-print(f"• Ripeness Grade: {data['ripeness_grade']}")
-print(f"• Net Arbitrage Revenue: {data['economic_arbitrage']['projected_revenue']}")
-print(f"• Fuel Cost Savings: {data['economic_arbitrage']['fuel_cost_savings']}")
-print(f"• Silo Destination: {data['economic_arbitrage']['recommended_silo']}")
-print(f"• Waypoints Planned: {len(data['kinematics_details']['waypoints'])} points")
+print(f"* Predicted Yield: {data['yield_prediction_bushels']} bu")
+print(f"* Ripeness Grade: {data['ripeness_grade']}")
+print(f"* Net Arbitrage Revenue: {data['economic_arbitrage']['projected_revenue']}")
+print(f"* Fuel Cost Savings: {data['economic_arbitrage']['fuel_cost_savings']}")
+print(f"* Silo Destination: {data['economic_arbitrage']['recommended_silo']}")
+print(f"* Waypoints Planned: {len(data['kinematics_details']['waypoints'])} points")
+
 
 print("\n==================================================")
 print("2. LIVE AGRICOPILOT NLP ASSISTANT TEST")

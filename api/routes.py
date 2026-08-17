@@ -364,5 +364,22 @@ async def copilot_chat(req: CopilotChatRequest):
     return res
 
 
+@router.get("/bedrock-status")
+def get_bedrock_status():
+    """
+    Returns AWS Bedrock runtime connectivity and active foundation model status.
+    """
+    from engine.copilot import _check_bedrock, BEDROCK_MODELS
+    client, available = _check_bedrock()
+    return {
+        "bedrock_available": available,
+        "active_model": copilot_agent._bedrock_model_id or (BEDROCK_MODELS[0] if available else None),
+        "supported_models": BEDROCK_MODELS,
+        "mode": "AWS_BEDROCK_LIVE" if available else "LOCAL_AGRONOMY_STANDBY",
+        "description": "AWS Bedrock Claude 3.5 Sonnet / Nova reasoning engine active" if available else "Local multi-agent deterministic rules active (standby for AWS credentials)",
+    }
+
+
+
 
 

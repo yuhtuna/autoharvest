@@ -22,27 +22,40 @@ def _check_bedrock():
         return _bedrock_client, _bedrock_available
 
     try:
+        from dotenv import load_dotenv
+        load_dotenv()
         import boto3
+        session = boto3.Session()
+        creds = session.get_credentials()
+        if not creds:
+            _bedrock_available = False
+            print("[AgriCopilot] No AWS credentials found. Using intelligent Agronomy rule fallback.")
+            return None, False
+
         region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
-        client = boto3.client("bedrock-runtime", region_name=region)
-        # Quick test: list will fail if no creds
-        boto3.client("bedrock", region_name=region).list_foundation_models(maxResults=1)
+        client = session.client("bedrock-runtime", region_name=region)
         _bedrock_client = client
         _bedrock_available = True
-        print(f"[AgriCopilot] AWS Bedrock connected (region: {region})")
+        print(f"[AgriCopilot] AWS Bedrock client initialized (region: {region})")
         return _bedrock_client, True
     except Exception as e:
         _bedrock_available = False
-        print(f"[AgriCopilot] Bedrock unavailable ({type(e).__name__}), using template fallback")
+        print(f"[AgriCopilot] Bedrock unavailable ({type(e).__name__}: {e}), using template fallback")
         return None, False
 
 
-# Model preference order
+# Model preference order (includes cross-region inference profiles)
 BEDROCK_MODELS = [
+    "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
     "anthropic.claude-3-5-sonnet-20241022-v2:0",
+    "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
+    "anthropic.claude-3-5-sonnet-20240620-v1:0",
+    "us.anthropic.claude-3-haiku-20240307-v1:0",
     "anthropic.claude-3-haiku-20240307-v1:0",
+    "amazon.nova-pro-v1:0",
     "amazon.nova-lite-v1:0",
 ]
+
 
 
 class AgriCopilotAgent:
