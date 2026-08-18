@@ -122,4 +122,20 @@ class CopilotChatRequest(BaseModel):
     context: Optional[Dict[str, Any]] = None
 
 
+class DeployUnitRequest(BaseModel):
+    unit_type: str = Field(..., example="DRONE_SCOUT", description="COMBINE, TRACTOR, GRAIN_CART, DRONE_SCOUT, HUMAN_CREW")
+    label: str = Field(..., example="Scout UAV Alpha")
+    position: Optional[List[float]] = None
+    assigned_task: Optional[str] = "AUTONOMOUS_OPERATION"
+
+
+class MapHarvestZoneRequest(BaseModel):
+    polygon_coords: List[List[float]] = Field(..., description="List of [lon, lat] points outlining custom zone")
+    crop_type: Optional[str] = "WHEAT_HARD_RED"
+    field_name: Optional[str] = "Custom Drawn Harvest Parcel"
+    soil_moisture_pct: Optional[float] = 18.4
+    soil_temp_c: Optional[float] = 22.1
+
+
+
 

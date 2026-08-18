@@ -1,5 +1,24 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Layers, Eye, RefreshCw, ZoomIn, ZoomOut, AlertTriangle, Crosshair, Camera, Compass } from "lucide-react";
+import { 
+  Layers, 
+  Eye, 
+  RefreshCw, 
+  ZoomIn, 
+  ZoomOut, 
+  AlertTriangle, 
+  Crosshair, 
+  Camera, 
+  Compass,
+  Plus,
+  Users,
+  Radio,
+  Navigation,
+  Edit3,
+  Check,
+  X,
+  Shield,
+  Trash2
+} from "lucide-react";
 
 export function FieldMap2D({
   fieldPreset,
@@ -7,6 +26,9 @@ export function FieldMap2D({
   telemetry,
   activeObstacle,
   activeScenario,
+  onDeployUnit,
+  onRemoveUnit,
+  onMapHarvestZone,
 }) {
   const canvasRef = useRef(null);
   
@@ -17,6 +39,13 @@ export function FieldMap2D({
   const [showHeadlands, setShowHeadlands] = useState(true);
   const [showCutTrail, setShowCutTrail] = useState(true);
   const [zoom, setZoom] = useState(1.0);
+
+  // Swarm Fleet & Zone Mapping State
+  const [showDeployMenu, setShowDeployMenu] = useState(false);
+  const [isDrawingZone, setIsDrawingZone] = useState(false);
+  const [customZonePoints, setCustomZonePoints] = useState([]);
+  const [selectedUnitId, setSelectedUnitId] = useState(null);
+
 
   // 3D Perspective Reel Animation Frame
   const animFrameRef = useRef(0);
@@ -422,10 +451,215 @@ export function FieldMap2D({
       }
     }
 
-  }, [fieldPreset, missionPlan, telemetry, activeObstacle, activeScenario, showNDVI, showTrajectories, showHeadlands, showCutTrail, zoom, viewMode]);
+      // 8. Draw All Deployed Swarm Units (Drones, Human Crew, Grain Carts, Combines)
+      const deployedList = telemetry?.deployed_units || [];
+      deployedList.forEach((unit) => {
+        if (!unit.position) return;
+        const ux = toCanvasX(unit.position[0]);
+        const uy = toCanvasY(unit.position[1]);
+        const uType = unit.type;
+        const uHeading = ((unit.heading || 0) * Math.PI) / 180.0;
+
+        ctx.save();
+        ctx.translate(ux, uy);
+
+        if (uType === "DRONE_SCOUT") {
+          // Quadcopter Drone
+          ctx.rotate(uHeading);
+
+          // Radar Scan Cone / Sweep Circle
+          ctx.fillStyle = "rgba(56, 189, 248, 0.12)";
+          ctx.beginPath();
+          ctx.arc(0, 0, 32, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "rgba(56, 189, 248, 0.4)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
+          // Quad frame X
+          ctx.strokeStyle = "#38bdf8";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(-12, -12);
+          ctx.lineTo(12, 12);
+          ctx.moveTo(-12, 12);
+          ctx.lineTo(12, -12);
+          ctx.stroke();
+
+          // Central fuselage
+          ctx.fillStyle = "#0284c7";
+          ctx.beginPath();
+          ctx.arc(0, 0, 5, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 4x Rotors
+          [[-12, -12], [12, -12], [-12, 12], [12, 12]].forEach(([rx, ry]) => {
+            ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+            ctx.beginPath();
+            ctx.arc(rx, ry, 3.5, 0, Math.PI * 2);
+            ctx.fill();
+          });
+
+          ctx.restore();
+
+          // Drone Label Tag
+          ctx.fillStyle = "#38bdf8";
+          ctx.font = "bold 9.5px JetBrains Mono, monospace";
+          ctx.fillText(`🛸 ${unit.label || "UAV Scout"} [ALT: 45m]`, ux + 12, uy - 10);
+
+        } else if (uType === "HUMAN_CREW") {
+          // Human Field Crew & Agronomist (with ISO 25119 15m Safety Perimeter)
+          const safetyRadiusPx = Math.max(22, (availW / (maxLon - minLon)) * 0.00018 * zoom);
+
+          // Pulsing safety exclusion zone
+          ctx.fillStyle = "rgba(245, 158, 11, 0.15)";
+          ctx.beginPath();
+          ctx.arc(0, 0, safetyRadiusPx, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#f59e0b";
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 3]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Worker Body
+          ctx.fillStyle = "#ea580c"; // Hi-vis safety vest
+          ctx.beginPath();
+          ctx.arc(0, 0, 6, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Hard hat yellow
+          ctx.fillStyle = "#facc15";
+          ctx.beginPath();
+          ctx.arc(0, -2, 4, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.restore();
+
+          // Worker Safety Label
+          ctx.fillStyle = "#fbbf24";
+          ctx.font = "bold 9.5px JetBrains Mono, monospace";
+          ctx.fillText(`👷‍♂️ ${unit.label || "Agronomist Crew"} [15m SAFE]`, ux + 12, uy - 10);
+
+        } else if (uType === "GRAIN_CART") {
+          // Chaser Grain Cart Tractor
+          ctx.rotate(uHeading);
+          ctx.fillStyle = "#0284c7";
+          ctx.strokeStyle = "#38bdf8";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.roundRect(-10, -14, 20, 28, 3);
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+
+          ctx.fillStyle = "#38bdf8";
+          ctx.font = "bold 9.5px JetBrains Mono, monospace";
+          ctx.fillText(`🚛 ${unit.label || "Chaser Cart"}`, ux + 14, uy - 8);
+
+        } else if (uType === "COMBINE" && unit.id !== "COMBINE_01") {
+          // Secondary Harvester
+          ctx.rotate(uHeading);
+          ctx.fillStyle = "#06b6d4";
+          ctx.beginPath();
+          ctx.roundRect(-10, -18, 20, 32, 4);
+          ctx.fill();
+          ctx.restore();
+
+          ctx.fillStyle = "#22d3ee";
+          ctx.font = "bold 9.5px JetBrains Mono, monospace";
+          ctx.fillText(`🚜 ${unit.label || "Combine 02"}`, ux + 14, uy - 8);
+        } else {
+          ctx.restore();
+        }
+      });
+
+      // 9. Draw Custom Zone Points (if in drawing mode)
+      if (customZonePoints.length > 0) {
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 2.5;
+        ctx.fillStyle = "rgba(56, 189, 248, 0.25)";
+        ctx.beginPath();
+        customZonePoints.forEach((pt, idx) => {
+          const px = toCanvasX(pt[0]);
+          const py = toCanvasY(pt[1]);
+          if (idx === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        });
+        if (customZonePoints.length > 2) {
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.stroke();
+
+        // Draw Vertices Dots
+        customZonePoints.forEach((pt, idx) => {
+          const px = toCanvasX(pt[0]);
+          const py = toCanvasY(pt[1]);
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath();
+          ctx.arc(px, py, 5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#0284c7";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        });
+      }
+    }
+
+  }, [fieldPreset, missionPlan, telemetry, activeObstacle, activeScenario, showNDVI, showTrajectories, showHeadlands, showCutTrail, zoom, viewMode, customZonePoints, isDrawingZone]);
+
+  // Handle Canvas Click for Custom Zone Mapping
+  const handleCanvasClick = (e) => {
+    if (!isDrawingZone) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    const width = rect.width;
+    const height = rect.height;
+
+    const poly = fieldPreset?.coordinates_polygon || [
+      [-96.812, 41.256],
+      [-96.801, 41.256],
+      [-96.801, 41.248],
+      [-96.812, 41.248],
+    ];
+    const lons = poly.map((p) => p[0]);
+    const lats = poly.map((p) => p[1]);
+    const minLon = Math.min(...lons);
+    const maxLon = Math.max(...lons);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+
+    const padding = 55;
+    const availW = width - padding * 2;
+    const availH = height - padding * 2;
+
+    const offsetX = (width - availW * zoom) / 2;
+    const offsetY = (height - availH * zoom) / 2;
+
+    const lon = minLon + ((clickX - offsetX) / (availW * zoom)) * (maxLon - minLon);
+    const lat = maxLat - ((clickY - offsetY) / (availH * zoom)) * (maxLat - minLat);
+
+    setCustomZonePoints((prev) => [...prev, [parseFloat(lon.toFixed(6)), parseFloat(lat.toFixed(6))]]);
+  };
+
+  const handleFinishDrawing = () => {
+    if (customZonePoints.length >= 3) {
+      if (onMapHarvestZone) {
+        onMapHarvestZone(customZonePoints);
+      }
+      setIsDrawingZone(false);
+      setCustomZonePoints([]);
+    }
+  };
 
   return (
-    <div className="map-panel" style={{ height: "100%", flex: 1 }}>
+    <div className="map-panel" style={{ height: "100%", flex: 1, position: "relative" }}>
       
       {/* Top Map Toolbar */}
       <div className="map-header-bar">
@@ -439,16 +673,108 @@ export function FieldMap2D({
           </span>
         </div>
 
-        {/* View Mode & Layer Toggles */}
+        {/* View Mode, Swarm Deployer, & Layer Toggles */}
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           
+          {/* Swarm Fleet Deployer Button */}
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={() => setShowDeployMenu(!showDeployMenu)}
+              className="speed-pill active"
+              style={{ display: "flex", alignItems: "center", gap: "4px", background: "rgba(16, 185, 129, 0.15)", color: "#34d399", border: "1px solid rgba(16, 185, 129, 0.3)" }}
+            >
+              <Plus size={12} /> Deploy Swarm Unit
+            </button>
+
+            {showDeployMenu && (
+              <div 
+                style={{
+                  position: "absolute",
+                  top: "100%",
+                  right: 0,
+                  marginTop: "6px",
+                  background: "rgba(15, 23, 42, 0.95)",
+                  border: "1px solid var(--border-color)",
+                  borderRadius: "8px",
+                  padding: "6px",
+                  width: "210px",
+                  zIndex: 50,
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "4px"
+                }}
+              >
+                <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-muted)", padding: "2px 6px" }}>
+                  AVAILABLE AUTONOMOUS ASSETS
+                </div>
+                
+                <button
+                  onClick={() => {
+                    onDeployUnit?.({ unitType: "DRONE_SCOUT", label: "DJI Agras T50 UAV", assignedTask: "THERMAL_CROP_SURVEY" });
+                    setShowDeployMenu(false);
+                  }}
+                  className="speed-pill"
+                  style={{ textAlign: "left", padding: "6px 8px", fontSize: "0.7rem", justifyContent: "flex-start" }}
+                >
+                  🛸 Deploy Scout UAV Drone
+                </button>
+
+                <button
+                  onClick={() => {
+                    onDeployUnit?.({ unitType: "GRAIN_CART", label: "Brent 1596 Grain Cart", assignedTask: "UNLOAD_ON_THE_GO" });
+                    setShowDeployMenu(false);
+                  }}
+                  className="speed-pill"
+                  style={{ textAlign: "left", padding: "6px 8px", fontSize: "0.7rem", justifyContent: "flex-start" }}
+                >
+                  🚛 Deploy Chaser Grain Cart
+                </button>
+
+                <button
+                  onClick={() => {
+                    onDeployUnit?.({ unitType: "HUMAN_CREW", label: "Agronomy Field Crew 1", assignedTask: "GROUND_TRUTH_SAMPLING" });
+                    setShowDeployMenu(false);
+                  }}
+                  className="speed-pill"
+                  style={{ textAlign: "left", padding: "6px 8px", fontSize: "0.7rem", justifyContent: "flex-start" }}
+                >
+                  👷‍♂️ Deploy Human Field Crew
+                </button>
+
+                <button
+                  onClick={() => {
+                    onDeployUnit?.({ unitType: "COMBINE", label: "Claas Lexion 8900", assignedTask: "PARALLEL_SWATH_CUT" });
+                    setShowDeployMenu(false);
+                  }}
+                  className="speed-pill"
+                  style={{ textAlign: "left", padding: "6px 8px", fontSize: "0.7rem", justifyContent: "flex-start" }}
+                >
+                  🚜 Deploy 2nd Harvester
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Interactive Draw Zone Button */}
+          <button
+            onClick={() => {
+              setIsDrawingZone(!isDrawingZone);
+              setCustomZonePoints([]);
+            }}
+            className={`speed-pill ${isDrawingZone ? "active" : ""}`}
+            style={{ display: "flex", alignItems: "center", gap: "4px", background: isDrawingZone ? "rgba(56, 189, 248, 0.25)" : "transparent", color: isDrawingZone ? "#38bdf8" : "inherit" }}
+          >
+            <Edit3 size={12} /> {isDrawingZone ? "Cancel Drawing" : "Draw Zone"}
+          </button>
+
           {/* 2D vs 3D Cab POV Switcher */}
           <button
             onClick={() => setViewMode(viewMode === "2D_RADAR" ? "3D_CAB_POV" : "2D_RADAR")}
             className="speed-pill active"
             style={{ display: "flex", alignItems: "center", gap: "4px", background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8", border: "1px solid rgba(56, 189, 248, 0.3)" }}
           >
-            <Camera size={12} /> {viewMode === "2D_RADAR" ? "Switch to 3D Cab POV" : "Switch to 2D Radar"}
+            <Camera size={12} /> {viewMode === "2D_RADAR" ? "3D Cab POV" : "2D Radar"}
           </button>
 
           {viewMode === "2D_RADAR" && (
@@ -494,11 +820,63 @@ export function FieldMap2D({
         </div>
       </div>
 
-      {/* Interactive Canvas Container */}
-      <div style={{ flex: 1, position: "relative", minHeight: "360px", background: "#060911" }}>
+      {/* Floating Drawing Banner when drawing mode is ON */}
+      {isDrawingZone && (
+        <div 
+          style={{
+            position: "absolute",
+            top: "45px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "rgba(15, 23, 42, 0.95)",
+            border: "1px solid #38bdf8",
+            borderRadius: "30px",
+            padding: "6px 16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            zIndex: 40,
+            boxShadow: "0 8px 20px rgba(0,0,0,0.5)",
+            fontSize: "0.75rem",
+          }}
+        >
+          <span style={{ color: "#38bdf8", fontWeight: 700 }}>
+            📐 Click on Radar Map to Add Boundaries ({customZonePoints.length} points)
+          </span>
+
+          <button
+            onClick={handleFinishDrawing}
+            disabled={customZonePoints.length < 3}
+            className="btn btn-primary"
+            style={{ padding: "4px 10px", fontSize: "0.7rem", borderRadius: "14px" }}
+          >
+            <Check size={12} style={{ marginRight: "4px" }} />
+            Generate Swaths
+          </button>
+
+          <button
+            onClick={() => {
+              setIsDrawingZone(false);
+              setCustomZonePoints([]);
+            }}
+            style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", display: "flex", alignItems: "center" }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Main Canvas Viewport */}
+      <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
         <canvas
           ref={canvasRef}
-          style={{ width: "100%", height: "100%", display: "block" }}
+          onClick={handleCanvasClick}
+          style={{
+            width: "100%",
+            height: "100%",
+            display: "block",
+            cursor: isDrawingZone ? "crosshair" : "default"
+          }}
         />
       </div>
 

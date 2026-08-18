@@ -109,6 +109,48 @@ export async function fetchBedrockStatus() {
   return res.json();
 }
 
+export async function deployFleetUnit({ unitType, label, position, assignedTask }) {
+  const res = await fetch(`${API_BASE}/deploy-unit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      unit_type: unitType,
+      label,
+      position,
+      assigned_task: assignedTask,
+    }),
+  });
+  if (!res.ok) throw new Error("Failed to deploy unit");
+  return res.json();
+}
+
+export async function removeFleetUnit(unitId) {
+  const res = await fetch(`${API_BASE}/remove-unit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ unit_id: unitId }),
+  });
+  if (!res.ok) throw new Error("Failed to remove unit");
+  return res.json();
+}
+
+export async function mapHarvestZone({ polygonCoords, cropType, fieldName, soilMoisturePct, soilTempC }) {
+  const res = await fetch(`${API_BASE}/map-harvest-zone`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      polygon_coords: polygonCoords,
+      crop_type: cropType,
+      field_name: fieldName,
+      soil_moisture_pct: soilMoisturePct,
+      soil_temp_c: soilTempC,
+    }),
+  });
+  if (!res.ok) throw new Error("Failed to map harvest zone");
+  return res.json();
+}
+
+
 
 
 

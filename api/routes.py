@@ -13,10 +13,13 @@ from api.schemas import (
     VideoAnalysisRequest,
     ImageAnalysisRequest,
     CopilotChatRequest,
+    DeployUnitRequest,
+    MapHarvestZoneRequest,
 )
 from api.websocket_manager import ws_manager
 from engine.orchestrator import AutoHarvestOrchestrator
 from engine.copilot import AgriCopilotAgent
+
 
 router = APIRouter(prefix="/api/v1", tags=["AutoHarvest Core"])
 orchestrator = AutoHarvestOrchestrator()
@@ -378,6 +381,74 @@ def get_bedrock_status():
         "mode": "AWS_BEDROCK_LIVE" if available else "LOCAL_AGRONOMY_STANDBY",
         "description": "AWS Bedrock Claude 3.5 Sonnet / Nova reasoning engine active" if available else "Local multi-agent deterministic rules active (standby for AWS credentials)",
     }
+
+
+@router.post("/deploy-unit")
+async def deploy_unit(req: DeployUnitRequest):
+    """
+    Deploys a new autonomous machine, chaser grain cart, scouting drone, or human crew.
+    """
+    unit = ws_manager.deploy_unit(
+        unit_type=req.unit_type,
+        label=req.label,
+        position=req.position,
+        task=req.assigned_task or "AUTONOMOUS_OPERATION"
+    )
+    await ws_manager.broadcast_json({
+        "type": "FLEET_UNIT_DEPLOYED",
+        "unit": unit,
+        "deployed_units": ws_manager.deployed_units,
+    })
+    return {"status": "UNIT_DEPLOYED", "unit": unit, "total_units": len(ws_manager.deployed_units)}
+
+
+@router.post("/remove-unit")
+async def remove_unit(payload: Dict[str, str]):
+    """
+    Removes a deployed unit from the active swarm.
+    """
+    unit_id = payload.get("unit_id")
+    if not unit_id:
+        raise HTTPException(status_code=400, detail="unit_id required")
+    removed = ws_manager.remove_unit(unit_id)
+    await ws_manager.broadcast_json({
+        "type": "FLEET_UNIT_REMOVED",
+        "unit_id": unit_id,
+        "deployed_units": ws_manager.deployed_units,
+    })
+    return {"status": "UNIT_REMOVED" if removed else "NOT_FOUND", "unit_id": unit_id, "total_units": len(ws_manager.deployed_units)}
+
+
+@router.post("/map-harvest-zone")
+async def map_harvest_zone(req: MapHarvestZoneRequest):
+    """
+    Ingests custom drawn polygon coordinates, recalculates Boustrophedon swaths,
+    predicts yield, and generates dynamic Dubins path trajectories.
+    """
+    lons = [p[0] for p in req.polygon_coords]
+    lats = [p[1] for p in req.polygon_coords]
+    d_lon_m = (max(lons) - min(lons)) * 84000.0
+    d_lat_m = (max(lats) - min(lats)) * 111000.0
+    area_ha = round(max(2.0, (d_lon_m * d_lat_m) / 10000.0), 1)
+
+    plan = orchestrator.process_field_mission(
+        field_id="CUSTOM_DRAWN_ZONE",
+        crop_type=req.crop_type or "WHEAT_HARD_RED",
+        coordinates_polygon=req.polygon_coords,
+        soil_moisture_pct=req.soil_moisture_pct or 18.4,
+        soil_temp_c=req.soil_temp_c or 22.1,
+    )
+    ws_manager.load_mission_plan(plan)
+    ws_manager.reset_simulation()
+    
+    await ws_manager.broadcast_json({
+        "type": "CUSTOM_ZONE_MAPPED",
+        "field_id": "CUSTOM_DRAWN_ZONE",
+        "area_hectares": area_ha,
+        "plan": plan,
+    })
+    return {"status": "CUSTOM_ZONE_MAPPED", "area_hectares": area_ha, "plan": plan}
+
 
 
 

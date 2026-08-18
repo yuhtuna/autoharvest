@@ -9,8 +9,17 @@ import { DroneVisionModal } from "./components/DroneVisionModal";
 import { AgriCopilotModal } from "./components/AgriCopilotModal";
 import { MissionReportModal } from "./components/MissionReportModal";
 
-import { fetchFields, scanField, triggerScenario, sendFleetControl } from "./services/api";
+import { 
+  fetchFields, 
+  scanField, 
+  triggerScenario, 
+  sendFleetControl,
+  deployFleetUnit,
+  removeFleetUnit,
+  mapHarvestZone,
+} from "./services/api";
 import { fleetWS } from "./services/websocket";
+
 
 export default function App() {
   const [fields, setFields] = useState([]);
@@ -159,6 +168,44 @@ export default function App() {
     }
   };
 
+  // Handle Deploying Swarm Fleet Units
+  const handleDeployUnit = async (unitData) => {
+    try {
+      const res = await deployFleetUnit(unitData);
+      console.log("Deployed Swarm Unit:", res);
+    } catch (err) {
+      console.error("Deploy unit error:", err);
+    }
+  };
+
+  // Handle Removing Swarm Units
+  const handleRemoveUnit = async (unitId) => {
+    try {
+      await removeFleetUnit(unitId);
+    } catch (err) {
+      console.error("Remove unit error:", err);
+    }
+  };
+
+  // Handle User-Drawn Custom Harvest Zone
+  const handleMapHarvestZone = async (polygonCoords) => {
+    try {
+      const res = await mapHarvestZone({
+        polygonCoords,
+        cropType: currentFieldPreset?.crop_type || "WHEAT_HARD_RED",
+        fieldName: "Custom Drawn Harvest Parcel",
+      });
+      if (res?.plan) {
+        setMissionPlan(res.plan);
+        setIsSimulationRunning(false);
+        setIsPaused(false);
+        hasCelebratedRef.current = false;
+      }
+    } catch (err) {
+      console.error("Map harvest zone error:", err);
+    }
+  };
+
   const currentFieldPreset = fields.find((f) => f.id === currentFieldId) || fields[0];
 
   return (
@@ -186,6 +233,9 @@ export default function App() {
             telemetry={telemetry}
             activeObstacle={activeObstacle}
             activeScenario={activeScenario}
+            onDeployUnit={handleDeployUnit}
+            onRemoveUnit={handleRemoveUnit}
+            onMapHarvestZone={handleMapHarvestZone}
           />
 
           {/* Floating Modern Control Dock */}
@@ -196,6 +246,7 @@ export default function App() {
             onControlFleet={handleControlFleet}
           />
         </div>
+
 
         {/* Right: Clean Telemetry Sidebar (No flashing dials) */}
         <CleanTelemetrySidebar

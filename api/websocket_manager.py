@@ -52,10 +52,59 @@ class WebSocketManager:
         self.e_stop_active = False
         self.safety_alert = "GEOFENCE_ACTIVE_ALL_CLEAR"
 
+        # Multi-Unit Fleet Deployment & Swarm Management
+        self.deployed_units: List[Dict[str, Any]] = [
+            {
+                "id": "COMBINE_01",
+                "type": "COMBINE",
+                "label": "John Deere X9 1100 (Primary)",
+                "position": [-96.81134, 41.2555],
+                "heading": 180.0,
+                "speed_kmh": 6.8,
+                "status": "AUTONOMOUS_HARVEST",
+                "role": "PRIMARY_SWATH_CUTTER",
+            }
+        ]
+
         # Active Obstacles / Chaos
         self.active_obstacle: Optional[Dict[str, Any]] = None
         self.active_scenario = "NORMAL_HARVEST"
         self.loop_task: Optional[asyncio.Task] = None
+
+    def deploy_unit(self, unit_type: str, label: str, position: Optional[List[float]] = None, task: str = "AUTONOMOUS_OPERATION") -> Dict[str, Any]:
+        """Deploys a new autonomous machine, drone, or human crew into the live mission."""
+        unit_count = len([u for u in self.deployed_units if u["type"] == unit_type]) + 1
+        unit_id = f"{unit_type}_{unit_count:02d}"
+
+        # If no position specified, spawn near current field center with slight offset
+        if not position:
+            offset_lon = (unit_count * 0.0012) * (-1 if unit_count % 2 == 0 else 1)
+            offset_lat = (unit_count * 0.0008) * (1 if unit_count % 2 == 0 else -1)
+            position = [self.current_pos[0] + offset_lon, self.current_pos[1] + offset_lat]
+
+        speed = 18.5 if unit_type == "DRONE_SCOUT" else (4.5 if unit_type == "HUMAN_CREW" else 6.2)
+
+        new_unit = {
+            "id": unit_id,
+            "type": unit_type,
+            "label": label or f"{unit_type.replace('_', ' ').title()} {unit_count}",
+            "position": position,
+            "heading": random.uniform(0, 360),
+            "speed_kmh": speed,
+            "status": "DEPLOYED_ACTIVE",
+            "role": task or "FIELD_SUPPORT",
+            "battery_pct": 98.0,
+        }
+
+        self.deployed_units.append(new_unit)
+        print(f"[FleetManager] Deployed unit {unit_id} ({unit_type}) at {position}")
+        return new_unit
+
+    def remove_unit(self, unit_id: str) -> bool:
+        """Removes a deployed unit from the active swarm."""
+        initial_len = len(self.deployed_units)
+        self.deployed_units = [u for u in self.deployed_units if u["id"] != unit_id]
+        return len(self.deployed_units) < initial_len
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
@@ -80,6 +129,7 @@ class WebSocketManager:
             "timestamp": time.time(),
             "field_id": self.current_field_id,
             "telemetry": self.get_telemetry_payload(),
+            "deployed_units": self.deployed_units,
             "active_scenario": self.active_scenario,
             "active_obstacle": self.active_obstacle,
             "is_running": self.is_running,
@@ -113,7 +163,9 @@ class WebSocketManager:
             "safety_status": self.safety_alert,
             "current_waypoint_idx": self.current_waypoint_idx,
             "total_waypoints": len(self.waypoints),
+            "deployed_units": self.deployed_units,
         }
+
 
     def load_mission_plan(self, plan: Dict[str, Any]):
         self.current_plan = plan
@@ -285,6 +337,26 @@ class WebSocketManager:
                                 self.safety_alert = f"ESTOP_TRIGGERED_{self.active_obstacle['type']}"
                                 self.speed_kmh = 0.0
 
+                    # Dynamically update other deployed swarm units
+                    t_now = time.time()
+                    for unit in self.deployed_units:
+                        if unit.get("type") == "DRONE_SCOUT":
+                            # Orbit field in wide aerial sweep
+                            orbit_r = 0.0035
+                            unit["position"] = [
+                                self.current_pos[0] + orbit_r * math.cos(t_now * 0.4),
+                                self.current_pos[1] + orbit_r * math.sin(t_now * 0.4)
+                            ]
+                            unit["heading"] = (math.degrees(t_now * 0.4) + 90) % 360
+                            unit["battery_pct"] = max(10.0, unit.get("battery_pct", 98.0) - 0.002)
+
+                        elif unit.get("type") == "GRAIN_CART" and unit.get("id") != "COMBINE_01":
+                            # Shadow combine or shuttle
+                            cart_offset_x = -0.0004
+                            cart_offset_y = 0.0002
+                            unit["position"] = [self.current_pos[0] + cart_offset_x, self.current_pos[1] + cart_offset_y]
+                            unit["heading"] = self.heading
+
                 # Broadcast telemetry packet
                 if self.active_connections:
                     telemetry_msg = {
@@ -292,6 +364,7 @@ class WebSocketManager:
                         "timestamp": time.time(),
                         "telemetry": self.get_telemetry_payload(),
                     }
+
                     await self.broadcast_json(telemetry_msg)
 
             except Exception as e:
