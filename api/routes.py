@@ -447,7 +447,69 @@ async def map_harvest_zone(req: MapHarvestZoneRequest):
         "area_hectares": area_ha,
         "plan": plan,
     })
-    return {"status": "CUSTOM_ZONE_MAPPED", "area_hectares": area_ha, "plan": plan}
+@router.get("/zones")
+def get_zones():
+    """Returns list of all active field partition zones."""
+    return ws_manager.zones
+
+
+@router.post("/zones")
+async def create_zone(payload: Dict[str, Any]):
+    """Creates a new named zone and broadcasts update."""
+    name = payload.get("name", "Custom Harvest Sector")
+    polygon = payload.get("polygon", [])
+    crop_type = payload.get("crop_type", "WHEAT_HARD_RED")
+    if len(polygon) < 3:
+        raise HTTPException(status_code=400, detail="Polygon must have at least 3 points")
+    
+    zone = ws_manager.add_zone(name=name, polygon=polygon, crop_type=crop_type)
+    await ws_manager.broadcast_json({
+        "type": "ZONES_UPDATED",
+        "zones": ws_manager.zones,
+    })
+    return {"status": "ZONE_CREATED", "zone": zone, "zones": ws_manager.zones}
+
+
+@router.delete("/zones/{zone_id}")
+async def delete_zone(zone_id: str):
+    """Deletes a zone by ID."""
+    removed = ws_manager.delete_zone(zone_id)
+    await ws_manager.broadcast_json({
+        "type": "ZONES_UPDATED",
+        "zones": ws_manager.zones,
+    })
+    return {"status": "ZONE_DELETED" if removed else "NOT_FOUND", "zones": ws_manager.zones}
+
+
+@router.post("/zones/{zone_id}/activate")
+async def activate_zone(zone_id: str):
+    """Generates Boustrophedon swaths and dispatches fleet to selected zone."""
+    zone = next((z for z in ws_manager.zones if z["id"] == zone_id), None)
+    if not zone:
+        raise HTTPException(status_code=404, detail="Zone not found")
+
+    plan = orchestrator.process_field_mission(
+        field_id=zone["id"],
+        crop_type=zone["crop_type"],
+        coordinates_polygon=zone["polygon"],
+        soil_moisture_pct=18.4,
+        soil_temp_c=22.1,
+    )
+    ws_manager.load_mission_plan(plan)
+    ws_manager.reset_simulation()
+    
+    # Mark zone as active
+    for z in ws_manager.zones:
+        z["status"] = "IN_PROGRESS" if z["id"] == zone_id else "STANDBY"
+
+    await ws_manager.broadcast_json({
+        "type": "ZONE_ACTIVATED",
+        "zone_id": zone_id,
+        "plan": plan,
+        "zones": ws_manager.zones,
+    })
+    return {"status": "ZONE_ACTIVATED", "zone": zone, "plan": plan}
+
 
 
 

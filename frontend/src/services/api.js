@@ -150,6 +150,39 @@ export async function mapHarvestZone({ polygonCoords, cropType, fieldName, soilM
   return res.json();
 }
 
+export async function fetchZones() {
+  const res = await fetch(`${API_BASE}/zones`);
+  if (!res.ok) throw new Error("Failed to fetch zones");
+  return res.json();
+}
+
+export async function createZone({ name, polygon, cropType }) {
+  const res = await fetch(`${API_BASE}/zones`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, polygon, crop_type: cropType }),
+  });
+  if (!res.ok) throw new Error("Failed to create zone");
+  return res.json();
+}
+
+export async function deleteZone(zoneId) {
+  const res = await fetch(`${API_BASE}/zones/${zoneId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Failed to delete zone");
+  return res.json();
+}
+
+export async function activateZone(zoneId) {
+  const res = await fetch(`${API_BASE}/zones/${zoneId}/activate`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error("Failed to activate zone");
+  return res.json();
+}
+
+
 
 
 

@@ -3,6 +3,7 @@ import confetti from "canvas-confetti";
 
 import { Header } from "./components/Header";
 import { FieldMap2D } from "./components/FieldMap2D";
+import { FleetOperationsSidebar } from "./components/FleetOperationsSidebar";
 import { FloatingControlDock } from "./components/FloatingControlDock";
 import { AgentsPanel } from "./components/AgentsPanel";
 import { MarketPanel } from "./components/MarketPanel";
@@ -17,7 +18,10 @@ import {
   sendFleetControl,
   deployFleetUnit,
   removeFleetUnit,
-  mapHarvestZone,
+  fetchZones,
+  createZone,
+  deleteZone,
+  activateZone,
 } from "./services/api";
 import { fleetWS } from "./services/websocket";
 
@@ -33,6 +37,30 @@ export default function App() {
   
   // Navigation Tabs: 'map' | 'agents' | 'vision' | 'market' | 'copilot' | 'report'
   const [activeTab, setActiveTab] = useState("map");
+
+  // Field Partition Zones & Swarm Units State
+  const [zones, setZones] = useState([
+    {
+      id: "ZONE_01",
+      name: "North Basin (Sector A)",
+      polygon: [
+        [-96.812, 41.256],
+        [-96.801, 41.256],
+        [-96.801, 41.248],
+        [-96.812, 41.248],
+      ],
+      crop_type: "WHEAT_HARD_RED",
+      area_ha: 48.5,
+      status: "IN_PROGRESS",
+      ripeness_brix: 14.8,
+      color: "#10b981",
+    }
+  ]);
+  const [deployedUnits, setDeployedUnits] = useState([]);
+
+  // Zone Drawing State
+  const [isDrawingZone, setIsDrawingZone] = useState(false);
+  const [drawingPoints, setDrawingPoints] = useState([]);
 
   const hasCelebratedRef = useRef(false);
 
@@ -59,6 +87,17 @@ export default function App() {
           });
           setMissionPlan(plan);
         }
+
+        // Fetch initial zones
+        try {
+          const initialZones = await fetchZones();
+          if (initialZones && initialZones.length > 0) {
+            setZones(initialZones);
+          }
+        } catch (e) {
+          console.warn("Could not fetch zones:", e);
+        }
+
       } catch (err) {
         console.error("Init Error:", err);
       }
@@ -72,6 +111,12 @@ export default function App() {
     const unsubscribe = fleetWS.subscribe((data) => {
       if (data.type === "TELEMETRY") {
         setTelemetry(data.telemetry);
+        if (data.telemetry?.deployed_units) {
+          setDeployedUnits(data.telemetry.deployed_units);
+        }
+        if (data.telemetry?.zones) {
+          setZones(data.telemetry.zones);
+        }
         if (data.telemetry?.cut_progress_pct >= 99.5 && !hasCelebratedRef.current) {
           hasCelebratedRef.current = true;
           confetti({
@@ -82,18 +127,25 @@ export default function App() {
         }
       } else if (data.type === "SNAPSHOT") {
         if (data.telemetry) setTelemetry(data.telemetry);
+        if (data.deployed_units) setDeployedUnits(data.deployed_units);
+        if (data.zones) setZones(data.zones);
         if (data.current_plan) setMissionPlan(data.current_plan);
         if (data.active_scenario) setActiveScenario(data.active_scenario);
         if (data.active_obstacle) setActiveObstacle(data.active_obstacle);
         setIsSimulationRunning(data.is_running || false);
         setIsPaused(data.is_paused || false);
-      } else if (data.type === "MISSION_PLAN_UPDATE" || data.type === "SCENARIO_TRIGGERED") {
+      } else if (data.type === "MISSION_PLAN_UPDATE" || data.type === "SCENARIO_TRIGGERED" || data.type === "ZONE_ACTIVATED") {
         if (data.plan) setMissionPlan(data.plan);
+        if (data.zones) setZones(data.zones);
         if (data.scenario) setActiveScenario(data.scenario);
         if (data.scenario === "RESET") {
           setActiveObstacle(null);
           hasCelebratedRef.current = false;
         }
+      } else if (data.type === "ZONES_UPDATED") {
+        if (data.zones) setZones(data.zones);
+      } else if (data.type === "FLEET_UNIT_DEPLOYED" || data.type === "FLEET_UNIT_REMOVED") {
+        if (data.deployed_units) setDeployedUnits(data.deployed_units);
       }
     });
 
@@ -170,7 +222,9 @@ export default function App() {
   const handleDeployUnit = async (unitData) => {
     try {
       const res = await deployFleetUnit(unitData);
-      console.log("Deployed Swarm Unit:", res);
+      if (res?.unit) {
+        setDeployedUnits((prev) => [...prev, res.unit]);
+      }
     } catch (err) {
       console.error("Deploy unit error:", err);
     }
@@ -180,19 +234,54 @@ export default function App() {
   const handleRemoveUnit = async (unitId) => {
     try {
       await removeFleetUnit(unitId);
+      setDeployedUnits((prev) => prev.filter((u) => u.id !== unitId));
     } catch (err) {
       console.error("Remove unit error:", err);
     }
   };
 
-  // Handle User-Drawn Custom Harvest Zone
-  const handleMapHarvestZone = async (polygonCoords) => {
+  // Handle Zone Creation & Management
+  const handleStartDrawing = () => {
+    setIsDrawingZone(true);
+    setDrawingPoints([]);
+  };
+
+  const handleCancelDrawing = () => {
+    setIsDrawingZone(false);
+    setDrawingPoints([]);
+  };
+
+  const handleAddDrawingPoint = (point) => {
+    setDrawingPoints((prev) => [...prev, point]);
+  };
+
+  const handleUndoPoint = () => {
+    setDrawingPoints((prev) => prev.slice(0, -1));
+  };
+
+  const handleSaveZone = async ({ name, polygon, cropType }) => {
     try {
-      const res = await mapHarvestZone({
-        polygonCoords,
-        cropType: currentFieldPreset?.crop_type || "WHEAT_HARD_RED",
-        fieldName: "Custom Drawn Harvest Parcel",
-      });
+      const res = await createZone({ name, polygon, cropType });
+      if (res?.zones) setZones(res.zones);
+      setIsDrawingZone(false);
+      setDrawingPoints([]);
+    } catch (err) {
+      console.error("Save zone error:", err);
+    }
+  };
+
+  const handleDeleteZone = async (zoneId) => {
+    try {
+      const res = await deleteZone(zoneId);
+      if (res?.zones) setZones(res.zones);
+    } catch (err) {
+      console.error("Delete zone error:", err);
+    }
+  };
+
+  const handleActivateZone = async (zoneId) => {
+    try {
+      const res = await activateZone(zoneId);
       if (res?.plan) {
         setMissionPlan(res.plan);
         setIsSimulationRunning(false);
@@ -200,7 +289,7 @@ export default function App() {
         hasCelebratedRef.current = false;
       }
     } catch (err) {
-      console.error("Map harvest zone error:", err);
+      console.error("Activate zone error:", err);
     }
   };
 
@@ -222,27 +311,51 @@ export default function App() {
       {/* 2. Full-Width Main Content Viewport (Tab-Driven) */}
       <main className="tab-viewport-container">
         
-        {/* Tab 1: Live Field Radar & 3D Cab POV */}
+        {/* Tab 1: Live Field Radar & Tactical Operations Center */}
         {activeTab === "map" && (
-          <div style={{ position: "relative", height: "100%", width: "100%", minHeight: 0 }}>
-            <FieldMap2D
-              fieldPreset={currentFieldPreset}
-              missionPlan={missionPlan}
+          <div className="fleet-radar-grid">
+            
+            {/* Map Canvas Viewport with Floating Control Dock */}
+            <div style={{ position: "relative", height: "100%", width: "100%", minHeight: 0, overflow: "hidden" }}>
+              <FieldMap2D
+                fieldPreset={currentFieldPreset}
+                missionPlan={missionPlan}
+                telemetry={telemetry}
+                activeObstacle={activeObstacle}
+                activeScenario={activeScenario}
+                zones={zones}
+                isDrawingZone={isDrawingZone}
+                drawingPoints={drawingPoints}
+                onAddDrawingPoint={handleAddDrawingPoint}
+              />
+
+              {/* Floating Modern Control Dock */}
+              <FloatingControlDock
+                isSimulationRunning={isSimulationRunning}
+                isPaused={isPaused}
+                telemetry={telemetry}
+                onControlFleet={handleControlFleet}
+              />
+            </div>
+
+            {/* Tactical Fleet & Zone Operations Sidebar */}
+            <FleetOperationsSidebar
               telemetry={telemetry}
-              activeObstacle={activeObstacle}
+              zones={zones}
+              deployedUnits={deployedUnits}
               activeScenario={activeScenario}
+              isDrawingZone={isDrawingZone}
+              drawingPoints={drawingPoints}
+              onStartDrawing={handleStartDrawing}
+              onCancelDrawing={handleCancelDrawing}
+              onUndoPoint={handleUndoPoint}
+              onSaveZone={handleSaveZone}
+              onDeleteZone={handleDeleteZone}
+              onActivateZone={handleActivateZone}
               onDeployUnit={handleDeployUnit}
               onRemoveUnit={handleRemoveUnit}
-              onMapHarvestZone={handleMapHarvestZone}
             />
 
-            {/* Floating Modern Control Dock */}
-            <FloatingControlDock
-              isSimulationRunning={isSimulationRunning}
-              isPaused={isPaused}
-              telemetry={telemetry}
-              onControlFleet={handleControlFleet}
-            />
           </div>
         )}
 
