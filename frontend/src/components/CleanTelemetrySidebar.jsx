@@ -20,8 +20,10 @@ export function CleanTelemetrySidebar({
   onTriggerScenario,
 }) {
   const [showChaos, setShowChaos] = useState(false);
+  const [expandedAgentIdx, setExpandedAgentIdx] = useState(null);
 
   const isOrchard = telemetry?.is_orchard || currentFieldPreset?.crop_type?.includes("APPLE") || currentFieldPreset?.crop_type?.includes("GRAPE");
+
   const isEstop = telemetry?.e_stop_active || false;
   
   // Broadacre grain metrics
@@ -176,43 +178,108 @@ export function CleanTelemetrySidebar({
         </div>
       </div>
 
-      {/* 3. Autonomous Agents Card */}
+      {/* 3. Autonomous Agents Card with Live Thought Stream */}
       <div className="clean-card">
         <div className="clean-card-title">
           <span>AWS Multi-Agent Fleet</span>
           <span style={{ fontSize: "0.64rem", color: "#38bdf8", fontWeight: 700 }}>Bedrock AgentCore</span>
         </div>
 
-        <div className="agent-item">
-          <span className="metric-label">🌿 CropVision™ Spectrometry</span>
-          <span className="agent-status-pill active">{isOrchard ? "14.8°Bx Prime" : "NDVI 0.733"}</span>
-        </div>
+        {[
+          {
+            name: "CropVision™ Spectrometry",
+            icon: "🌿",
+            status: isOrchard ? "14.8°Bx Prime" : "NDVI 0.733",
+            agentKey: "CropVision",
+            pillClass: "active",
+          },
+          {
+            name: "Kinematics Dubins Path",
+            icon: "🚜",
+            status: "● -32% Fuel",
+            agentKey: "Kinematics",
+            pillClass: "active",
+          },
+          {
+            name: "Soil & Climate Nowcast",
+            icon: "🌦️",
+            status: activeScenario === "STORM_INCOMING" ? "● Squall ETA 4.5h" : "● Optimal Window",
+            agentKey: "Soil",
+            pillClass: "ready",
+          },
+          {
+            name: "CBOT Market Arbitrage",
+            icon: "📈",
+            status: "● $6.42 / bu",
+            agentKey: "Market",
+            pillClass: "active",
+          },
+          {
+            name: "ISO 25119 Safety Guard",
+            icon: "🛡️",
+            status: isEstop ? "● E-STOP <15ms" : "● Nominal <15ms",
+            agentKey: "Safety",
+            pillClass: isEstop ? "warning" : "active",
+          },
+        ].map((item, idx) => {
+          const isExpanded = expandedAgentIdx === idx;
+          const agentStream = missionPlan?.agent_thought_stream?.find(
+            (a) => a.agent.toLowerCase().includes(item.agentKey.toLowerCase())
+          );
 
-        <div className="agent-item">
-          <span className="metric-label">🚜 Kinematics Dubins Path</span>
-          <span className="agent-status-pill active">● -32% Fuel</span>
-        </div>
+          return (
+            <div key={idx} style={{ borderBottom: idx < 4 ? "1px solid rgba(255,255,255,0.04)" : "none", paddingBottom: "4px" }}>
+              <div 
+                className="agent-item"
+                onClick={() => setExpandedAgentIdx(isExpanded ? null : idx)}
+                style={{ cursor: "pointer", borderRadius: "4px", padding: "4px", transition: "background 0.2s" }}
+              >
+                <span className="metric-label" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span>{item.icon}</span>
+                  <span style={{ color: isExpanded ? "#38bdf8" : "inherit" }}>{item.name}</span>
+                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span className={`agent-status-pill ${item.pillClass}`}>{item.status}</span>
+                  {isExpanded ? <ChevronUp size={12} color="#9ca3af" /> : <ChevronDown size={12} color="#9ca3af" />}
+                </div>
+              </div>
 
-        <div className="agent-item">
-          <span className="metric-label">🌦️ Soil & Climate Nowcast</span>
-          <span className="agent-status-pill ready">
-            {activeScenario === "STORM_INCOMING" ? "● Squall ETA 4.5h" : "● Optimal Window"}
-          </span>
-        </div>
-
-        <div className="agent-item">
-          <span className="metric-label">📈 CBOT Market Arbitrage</span>
-          <span className="agent-status-pill active">● $6.42 / bu</span>
-        </div>
-
-        <div className="agent-item">
-          <span className="metric-label">🛡️ ISO 25119 Safety Guard</span>
-          <span className={`agent-status-pill ${isEstop ? "warning" : "active"}`}>
-            {isEstop ? "● E-STOP <15ms" : "● Nominal <15ms"}
-          </span>
-        </div>
+              {isExpanded && (
+                <div 
+                  style={{
+                    margin: "4px 0 8px 0",
+                    padding: "8px 10px",
+                    borderRadius: "6px",
+                    background: "rgba(15, 23, 42, 0.9)",
+                    border: "1px solid rgba(56, 189, 248, 0.2)",
+                    fontSize: "0.68rem",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", color: "#38bdf8", fontWeight: 700, marginBottom: "4px" }}>
+                    <span>🧠 REASONING TRACE</span>
+                    <span className="mono">{(agentStream?.confidence ? (agentStream.confidence * 100).toFixed(1) : "98.5")}% Conf</span>
+                  </div>
+                  
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", color: "#e2e8f0", lineHeight: 1.35 }}>
+                    {agentStream?.thoughts ? (
+                      agentStream.thoughts.map((t, tIdx) => (
+                        <div key={tIdx} style={{ display: "flex", gap: "5px" }}>
+                          <span style={{ color: "#38bdf8" }}>•</span>
+                          <span>{t}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div>Evaluating real-time constraint satisfaction matrix across fleet...</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
 
       </div>
+
 
 
       {/* 4. Scenario Simulations Trigger Drawer (Clean collapsible) */}

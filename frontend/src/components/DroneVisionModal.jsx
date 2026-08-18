@@ -160,35 +160,65 @@ export function DroneVisionModal({ isOpen, onClose, currentCropType, onOpenCopil
       const bgGrad = ctx.createLinearGradient(0, 0, w, h);
       
       if (crop.includes("APPLE") || selectedPresetId.includes("HONEYCRISP")) {
-        bgGrad.addColorStop(0, "#192b15");
-        bgGrad.addColorStop(0.5, "#274020");
-        bgGrad.addColorStop(1, "#142211");
+        bgGrad.addColorStop(0, "#0e1a0b");
+        bgGrad.addColorStop(0.5, "#182a13");
+        bgGrad.addColorStop(1, "#0d170a");
       } else if (crop.includes("GRAPE") || selectedPresetId.includes("CABERNET")) {
-        bgGrad.addColorStop(0, "#231b2e");
-        bgGrad.addColorStop(0.5, "#342247");
-        bgGrad.addColorStop(1, "#181222");
+        bgGrad.addColorStop(0, "#16101f");
+        bgGrad.addColorStop(0.5, "#221430");
+        bgGrad.addColorStop(1, "#0f0a17");
       } else if (crop.includes("CITRUS") || selectedPresetId.includes("VALENCIA")) {
-        bgGrad.addColorStop(0, "#182a15");
-        bgGrad.addColorStop(0.5, "#2b3d1c");
-        bgGrad.addColorStop(1, "#152412");
+        bgGrad.addColorStop(0, "#111f0d");
+        bgGrad.addColorStop(0.5, "#1f3316");
+        bgGrad.addColorStop(1, "#0d180a");
       } else {
-        bgGrad.addColorStop(0, "#332e18");
-        bgGrad.addColorStop(0.5, "#473f21");
-        bgGrad.addColorStop(1, "#262211");
+        bgGrad.addColorStop(0, "#241f10");
+        bgGrad.addColorStop(0.5, "#3b3218");
+        bgGrad.addColorStop(1, "#1c180b");
       }
       ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, w, h);
 
-      // Draw orchard/canopy leafy texture circles
-      ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
-      for (let i = 0; i < 20; i++) {
-        const cx = (i * 75 + 30) % w;
-        const cy = (i * 55 + 40) % h;
+      // Draw realistic foliage leafy branches & sunlit depth
+      for (let i = 0; i < 36; i++) {
+        const cx = (i * 65 + 20) % (w + 40) - 20;
+        const cy = (i * 48 + 35) % (h + 40) - 20;
+        const radius = 35 + (i % 5) * 14;
+        
+        const leafGrad = ctx.createRadialGradient(cx, cy, 5, cx, cy, radius);
+        if (crop.includes("GRAPE")) {
+          leafGrad.addColorStop(0, "rgba(74, 222, 128, 0.12)");
+          leafGrad.addColorStop(0.7, "rgba(34, 197, 94, 0.05)");
+          leafGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+        } else if (crop.includes("CITRUS")) {
+          leafGrad.addColorStop(0, "rgba(101, 163, 13, 0.16)");
+          leafGrad.addColorStop(0.7, "rgba(74, 222, 128, 0.06)");
+          leafGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+        } else {
+          leafGrad.addColorStop(0, "rgba(34, 197, 94, 0.14)");
+          leafGrad.addColorStop(0.7, "rgba(20, 83, 45, 0.06)");
+          leafGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+        }
+        
+        ctx.fillStyle = leafGrad;
         ctx.beginPath();
-        ctx.arc(cx, cy, 40 + (i % 4) * 12, 0, Math.PI * 2);
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
         ctx.fill();
       }
+
+      // Trellis wires for vineyards
+      if (crop.includes("GRAPE")) {
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, h * 0.35);
+        ctx.lineTo(w, h * 0.35);
+        ctx.moveTo(0, h * 0.65);
+        ctx.lineTo(w, h * 0.65);
+        ctx.stroke();
+      }
     }
+
 
     function drawOverlays(ctx, w, h) {
       // 1. Draw HUD Reticle Grid
@@ -240,15 +270,66 @@ export function DroneVisionModal({ isOpen, onClose, currentCropType, onOpenCopil
           ctx.fillRect(x + bw - cLen, y + bh - 2, cLen, 2);
           ctx.fillRect(x + bw - 2, y + bh - cLen, 2, cLen);
 
-          // Fruit marker center glow
+          // Fruit marker realistic spherical gradient
           if (!uploadedImageSrc) {
-            ctx.fillStyle = isPrime 
-              ? (selectedPresetId.includes("GRAPE") ? "rgba(168, 85, 247, 0.75)" : (selectedPresetId.includes("CITRUS") ? "rgba(249, 115, 22, 0.8)" : "rgba(239, 68, 68, 0.75)"))
-              : "rgba(132, 204, 22, 0.65)";
+            const fx = x + bw / 2;
+            const fy = y + bh / 2;
+            const fr = Math.min(bw, bh) / 2.5;
+
+            const fruitGrad = ctx.createRadialGradient(fx - fr * 0.3, fy - fr * 0.3, fr * 0.1, fx, fy, fr);
+
+            if (selectedPresetId.includes("GRAPE") || det.label?.includes("Grape")) {
+              // Rich Cabernet / Pinot Noir purple grapes
+              if (isPrime) {
+                fruitGrad.addColorStop(0, "#c084fc");
+                fruitGrad.addColorStop(0.5, "#7e22ce");
+                fruitGrad.addColorStop(1, "#3b0764");
+              } else {
+                fruitGrad.addColorStop(0, "#a3e635");
+                fruitGrad.addColorStop(0.7, "#65a30d");
+                fruitGrad.addColorStop(1, "#365314");
+              }
+            } else if (selectedPresetId.includes("CITRUS") || det.label?.includes("Orange") || det.label?.includes("Citrus")) {
+              // Vibrant Valencia orange
+              if (isPrime) {
+                fruitGrad.addColorStop(0, "#fdba74");
+                fruitGrad.addColorStop(0.5, "#ea580c");
+                fruitGrad.addColorStop(1, "#7c2d12");
+              } else {
+                fruitGrad.addColorStop(0, "#bef264");
+                fruitGrad.addColorStop(0.6, "#84cc16");
+                fruitGrad.addColorStop(1, "#3f6212");
+              }
+            } else if (selectedPresetId.includes("WHEAT") || det.label?.includes("Wheat")) {
+              // Golden wheat grain head
+              fruitGrad.addColorStop(0, "#fef08a");
+              fruitGrad.addColorStop(0.6, "#ca8a04");
+              fruitGrad.addColorStop(1, "#713f12");
+            } else {
+              // Honeycrisp red dessert apple with blush
+              if (isPrime) {
+                fruitGrad.addColorStop(0, "#fca5a5");
+                fruitGrad.addColorStop(0.4, "#dc2626");
+                fruitGrad.addColorStop(1, "#7f1d1d");
+              } else {
+                fruitGrad.addColorStop(0, "#d9f99d");
+                fruitGrad.addColorStop(0.6, "#65a30d");
+                fruitGrad.addColorStop(1, "#365314");
+              }
+            }
+
+            ctx.fillStyle = fruitGrad;
             ctx.beginPath();
-            ctx.arc(x + bw / 2, y + bh / 2, Math.min(bw, bh) / 2.6, 0, Math.PI * 2);
+            ctx.arc(fx, fy, fr, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Specular glint
+            ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+            ctx.beginPath();
+            ctx.arc(fx - fr * 0.35, fy - fr * 0.35, fr * 0.22, 0, Math.PI * 2);
             ctx.fill();
           }
+
 
           // Floating Sugar Brix & Confidence Tag
           if (showBrixTags) {
