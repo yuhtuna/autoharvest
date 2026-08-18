@@ -30,6 +30,7 @@ export function AgriCopilotModal({
   currentFieldPreset,
   activeScenario,
   initialContext = null,
+  isTabMode = false,
 }) {
   const [messages, setMessages] = useState([
     {
@@ -52,10 +53,11 @@ export function AgriCopilotModal({
         console.warn("Bedrock status check error:", err);
       }
     }
-    if (isOpen) {
+    if (isOpen || isTabMode) {
       loadStatus();
     }
-  }, [isOpen]);
+  }, [isOpen, isTabMode]);
+
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -101,32 +103,26 @@ export function AgriCopilotModal({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && !isTabMode) return null;
 
-  return (
+  const chatContent = (
     <div
       style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(5, 8, 14, 0.75)",
-        backdropFilter: "blur(8px)",
-        zIndex: 9999,
+        width: "100%",
+        maxWidth: isTabMode ? "960px" : "460px",
+        margin: isTabMode ? "0 auto" : "0",
+        height: "100%",
+        background: "#0f172a",
+        border: isTabMode ? "1px solid var(--border-card)" : "none",
+        borderLeft: isTabMode ? "1px solid var(--border-card)" : "1px solid var(--border-card)",
+        borderRadius: isTabMode ? "var(--radius-lg)" : "0",
         display: "flex",
-        justifyContent: "flex-end",
+        flexDirection: "column",
+        boxShadow: isTabMode ? "0 10px 30px rgba(0,0,0,0.3)" : "-8px 0 32px rgba(0,0,0,0.5)",
+        overflow: "hidden",
       }}
     >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "460px",
-          height: "100%",
-          background: "#0f172a",
-          borderLeft: "1px solid var(--border-card)",
-          display: "flex",
-          flexDirection: "column",
-          boxShadow: "-8px 0 32px rgba(0,0,0,0.5)",
-        }}
-      >
+
         
         {/* Header */}
         <div
@@ -182,19 +178,22 @@ export function AgriCopilotModal({
           </div>
 
 
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              color: "var(--text-secondary)",
-              cursor: "pointer",
-              padding: "4px",
-            }}
-          >
-            <X size={18} />
-          </button>
+          {!isTabMode && (
+            <button
+              onClick={onClose}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--text-secondary)",
+                cursor: "pointer",
+                padding: "4px",
+              }}
+            >
+              <X size={18} />
+            </button>
+          )}
         </div>
+
 
         {/* Quick Suggestion Pills */}
         <div
@@ -339,8 +338,28 @@ export function AgriCopilotModal({
             <Send size={14} />
           </button>
         </div>
-
       </div>
+  );
+
+
+  if (isTabMode) {
+    return <div style={{ height: "100%", width: "100%", padding: "16px", display: "flex", flexDirection: "column", minHeight: 0 }}>{chatContent}</div>;
+  }
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        backgroundColor: "rgba(5, 8, 14, 0.75)",
+        backdropFilter: "blur(8px)",
+        zIndex: 9999,
+        display: "flex",
+        justifyContent: "flex-end",
+      }}
+    >
+      {chatContent}
     </div>
   );
 }
+

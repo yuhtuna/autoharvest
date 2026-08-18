@@ -17,8 +17,9 @@ export function MissionReportModal({
   telemetry,
   missionPlan,
   currentFieldPreset,
+  isTabMode = false,
 }) {
-  if (!isOpen) return null;
+  if (!isOpen && !isTabMode) return null;
 
   const isOrchard = telemetry?.is_orchard || currentFieldPreset?.crop_type?.includes("APPLE") || currentFieldPreset?.crop_type?.includes("GRAPE");
   const yieldVal = missionPlan?.yield_prediction_bushels ?? 4324.4;
@@ -31,37 +32,26 @@ export function MissionReportModal({
     window.print();
   };
 
-  return (
+  const reportContent = (
     <div
       style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(5, 8, 14, 0.8)",
-        backdropFilter: "blur(10px)",
-        zIndex: 9999,
+        width: "100%",
+        maxWidth: isTabMode ? "900px" : "820px",
+        margin: isTabMode ? "0 auto" : "0",
+        maxHeight: isTabMode ? "100%" : "92vh",
+        background: "#0f172a",
+        border: "1px solid var(--border-card)",
+        borderRadius: "14px",
         display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "20px",
+        flexDirection: "column",
+        overflow: "hidden",
+        boxShadow: isTabMode ? "none" : "0 20px 50px rgba(0,0,0,0.6)",
+        flex: 1,
       }}
     >
+      {/* Modal Toolbar */}
       <div
-        style={{
-          width: "100%",
-          maxWidth: "820px",
-          maxHeight: "92vh",
-          background: "#0f172a",
-          border: "1px solid var(--border-card)",
-          borderRadius: "14px",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-          boxShadow: "0 20px 50px rgba(0,0,0,0.6)",
-        }}
-      >
-        
-        {/* Modal Toolbar */}
-        <div
+
           style={{
             padding: "12px 20px",
             background: "#131d31",
@@ -84,20 +74,23 @@ export function MissionReportModal({
             >
               <Printer size={13} /> Print / Save PDF
             </button>
-            <button
-              onClick={onClose}
-              style={{
-                background: "none",
-                border: "none",
-                color: "var(--text-secondary)",
-                cursor: "pointer",
-                padding: "4px",
-              }}
-            >
-              <X size={18} />
-            </button>
+            {!isTabMode && (
+              <button
+                onClick={onClose}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--text-secondary)",
+                  cursor: "pointer",
+                  padding: "4px",
+                }}
+              >
+                <X size={18} />
+              </button>
+            )}
           </div>
         </div>
+
 
         {/* Printable Report Body */}
         <div
@@ -246,8 +239,30 @@ export function MissionReportModal({
           </div>
 
         </div>
-
       </div>
+  );
+
+
+  if (isTabMode) {
+    return <div style={{ height: "100%", width: "100%", padding: "16px", display: "flex", flexDirection: "column", minHeight: 0 }}>{reportContent}</div>;
+  }
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        backgroundColor: "rgba(5, 8, 14, 0.8)",
+        backdropFilter: "blur(10px)",
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "20px",
+      }}
+    >
+      {reportContent}
     </div>
   );
 }
+

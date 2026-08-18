@@ -605,9 +605,8 @@ export function FieldMap2D({
           ctx.stroke();
         });
       }
-    }
-
   }, [fieldPreset, missionPlan, telemetry, activeObstacle, activeScenario, showNDVI, showTrajectories, showHeadlands, showCutTrail, zoom, viewMode, customZonePoints, isDrawingZone]);
+
 
   // Handle Canvas Click for Custom Zone Mapping
   const handleCanvasClick = (e) => {
