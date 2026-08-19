@@ -17,9 +17,17 @@ import {
   ShieldAlert,
   MapPin,
   Sparkles,
-  Trash2
+  Trash2,
+  Sliders,
+  Edit3
 } from "lucide-react";
-import { deployUnit, createHarvestZone, deleteUnit, deleteHarvestZone } from "../services/api";
+import { 
+  deployUnit, 
+  createHarvestZone, 
+  deleteUnit, 
+  deleteHarvestZone,
+  manualReroutePath
+} from "../services/api";
 
 export function FieldMap2D({
   fieldPreset,
@@ -40,14 +48,19 @@ export function FieldMap2D({
   const [showCutTrail, setShowCutTrail] = useState(true);
   const [zoom, setZoom] = useState(1.0);
 
+  // Manual Interactive Waypoint Drag & Edit State
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [draggedNode, setDraggedNode] = useState(null);
+
   // Deployment Toolbars state
   const [showDeployMenu, setShowDeployMenu] = useState(false);
   const [showZoneMenu, setShowZoneMenu] = useState(false);
-  const [deployMode, setDeployMode] = useState(null); // 'RECON_DRONE', 'HUMAN_FIELD_CREW', 'COMBINE_HARVESTER', 'ROBOTIC_PICKER', 'GRAIN_CHASER_CART'
-  const [zoneMode, setZoneMode] = useState(null); // 'PRIORITY_HARVEST', 'QUARANTINE_BLIGHT', 'STAGING_HEADLAND'
+  const [deployMode, setDeployMode] = useState(null);
+  const [zoneMode, setZoneMode] = useState(null);
 
   // 3D Perspective Reel Animation Frame
   const animFrameRef = useRef(0);
+
 
 
   useEffect(() => {
@@ -750,6 +763,23 @@ export function FieldMap2D({
 
           {viewMode === "2D_RADAR" && (
             <>
+              {/* Interactive Path Edit / Waypoint Drag Toggle */}
+              <button
+                onClick={() => setIsEditMode(!isEditMode)}
+                className={`speed-pill ${isEditMode ? "active" : ""}`}
+                style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: "4px", 
+                  background: isEditMode ? "rgba(56, 189, 248, 0.2)" : "rgba(8, 12, 20, 0.85)", 
+                  color: isEditMode ? "#38bdf8" : "inherit",
+                  border: isEditMode ? "1px solid rgba(56, 189, 248, 0.4)" : "1px solid var(--border-subtle)" 
+                }}
+                title="Manually drag waypoint nodes to reroute harvester path"
+              >
+                <Edit3 size={11} /> {isEditMode ? "Done Editing" : "Manual Reroute"}
+              </button>
+
               <button
                 onClick={() => setShowNDVI(!showNDVI)}
                 className={`speed-pill ${showNDVI ? "active" : ""}`}
@@ -786,16 +816,145 @@ export function FieldMap2D({
         </div>
       </div>
 
+      {/* Manual Path Editing Floating Prompt */}
+      {isEditMode && (
+        <div 
+          style={{
+            position: "absolute",
+            top: "48px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "rgba(10, 16, 26, 0.95)",
+            border: "1px solid rgba(56, 189, 248, 0.4)",
+            color: "#e0f2fe",
+            padding: "5px 14px",
+            borderRadius: "var(--radius-full)",
+            fontSize: "0.72rem",
+            fontWeight: 600,
+            zIndex: 15,
+            boxShadow: "0 4px 16px rgba(0,0,0,0.6)",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}
+        >
+          <Sliders size={13} color="#38bdf8" />
+          <span>Interactive Guidance: Click and drag any waypoint node to manually reroute path</span>
+          <button 
+            onClick={() => setIsEditMode(false)}
+            style={{ background: "none", border: "none", color: "#38bdf8", cursor: "pointer", fontWeight: 700, padding: "0 4px" }}
+          >
+            Done
+          </button>
+        </div>
+      )}
+
       {/* Interactive Canvas Container */}
       <div style={{ flex: 1, width: "100%", height: "100%", position: "relative", background: "#060911" }}>
         <canvas
           ref={canvasRef}
           onClick={handleCanvasClick}
-          style={{ width: "100%", height: "100%", display: "block" }}
+          onMouseDown={(e) => {
+            if (!isEditMode) return;
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            const polygon = fieldPreset?.coordinates_polygon || [[-96.812, 41.256], [-96.801, 41.256], [-96.801, 41.248], [-96.812, 41.248]];
+            const lons = polygon.map(p => p[0]);
+            const lats = polygon.map(p => p[1]);
+            const minLon = Math.min(...lons);
+            const maxLon = Math.max(...lons);
+            const minLat = Math.min(...lats);
+            const maxLat = Math.max(...lats);
+
+            const pad = 48;
+            const width = rect.width;
+            const height = rect.height;
+            const availW = width - pad * 2;
+            const availH = height - pad * 2;
+            const centerX = width / 2;
+            const centerY = height / 2;
+
+            const toCanvasX = (lon) => centerX + ((lon - minLon) / (maxLon - minLon) - 0.5) * (availW * zoom);
+            const toCanvasY = (lat) => centerY + (0.5 - (lat - minLat) / (maxLat - minLat)) * (availH * zoom);
+
+            const multiPlans = telemetry?.multi_unit_plans || {};
+            for (const [uid, plan] of Object.entries(multiPlans)) {
+              const wps = plan.waypoints || [];
+              for (let i = 0; i < wps.length; i++) {
+                const wx = toCanvasX(wps[i].lon);
+                const wy = toCanvasY(wps[i].lat);
+                const dist = Math.hypot(clickX - wx, clickY - wy);
+                if (dist <= 14) {
+                  setDraggedNode({ unitId: uid, wpIdx: i });
+                  return;
+                }
+              }
+            }
+          }}
+          onMouseMove={(e) => {
+            if (!draggedNode) return;
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            const rect = canvas.getBoundingClientRect();
+            const curX = e.clientX - rect.left;
+            const curY = e.clientY - rect.top;
+
+            const polygon = fieldPreset?.coordinates_polygon || [[-96.812, 41.256], [-96.801, 41.256], [-96.801, 41.248], [-96.812, 41.248]];
+            const lons = polygon.map(p => p[0]);
+            const lats = polygon.map(p => p[1]);
+            const minLon = Math.min(...lons);
+            const maxLon = Math.max(...lons);
+            const minLat = Math.min(...lats);
+            const maxLat = Math.max(...lats);
+
+            const pad = 48;
+            const width = rect.width;
+            const height = rect.height;
+            const availW = width - pad * 2;
+            const availH = height - pad * 2;
+            const centerX = width / 2;
+            const centerY = height / 2;
+
+            const normX = (curX - (centerX - (availW * zoom) / 2)) / (availW * zoom);
+            const normY = (curY - (centerY - (availH * zoom) / 2)) / (availH * zoom);
+            const targetLon = minLon + normX * (maxLon - minLon);
+            const targetLat = maxLat - normY * (maxLat - minLat);
+
+            const multiPlans = telemetry?.multi_unit_plans || {};
+            const plan = multiPlans[draggedNode.unitId];
+            if (plan && plan.waypoints && plan.waypoints[draggedNode.wpIdx]) {
+              plan.waypoints[draggedNode.wpIdx].lon = targetLon;
+              plan.waypoints[draggedNode.wpIdx].lat = targetLat;
+            }
+          }}
+          onMouseUp={async () => {
+            if (draggedNode) {
+              const multiPlans = telemetry?.multi_unit_plans || {};
+              const plan = multiPlans[draggedNode.unitId];
+              if (plan && plan.waypoints) {
+                try {
+                  await manualReroutePath({
+                    fieldId: fieldPreset?.id,
+                    unitId: draggedNode.unitId,
+                    customWaypoints: plan.waypoints
+                  });
+                } catch (err) {
+                  console.error("Save dragged waypoint error:", err);
+                }
+              }
+              setDraggedNode(null);
+            }
+          }}
+          style={{ width: "100%", height: "100%", display: "block", cursor: isEditMode ? (draggedNode ? "grabbing" : "grab") : "default" }}
         />
       </div>
     </div>
   );
 }
+
 
 

@@ -154,5 +154,19 @@ class CreateHarvestZoneRequest(BaseModel):
     )
 
 
+class ManualRerouteRequest(BaseModel):
+    field_id: str = Field("FIELD_NE_LOT_4B", example="FIELD_NE_LOT_4B")
+    custom_sweep_angle_deg: Optional[float] = Field(None, example=45.0, description="Custom AB line angle (0-180 deg)")
+    swath_width_m: Optional[float] = Field(9.14, example=9.14)
+    unit_id: Optional[str] = None
+    custom_waypoints: Optional[List[Dict[str, Any]]] = None
+
+
+class OptimizePathRequest(BaseModel):
+    field_id: str = Field("FIELD_NE_LOT_4B", example="FIELD_NE_LOT_4B")
+    crop_type: Optional[str] = "WHEAT_HARD_RED"
+
+
+
 
 

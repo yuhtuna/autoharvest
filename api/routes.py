@@ -19,7 +19,10 @@ from api.schemas import (
     CopilotChatRequest,
     DeployUnitRequest,
     CreateHarvestZoneRequest,
+    ManualRerouteRequest,
+    OptimizePathRequest,
 )
+
 
 from api.websocket_manager import ws_manager
 from engine.orchestrator import AutoHarvestOrchestrator
@@ -463,6 +466,84 @@ async def remove_harvest_zone(zone_id: str):
         "harvest_zones": ws_manager.harvest_zones,
     })
     return {"status": "ZONE_REMOVED", "zone_id": zone_id}
+
+
+# ==========================================
+# PATH OPTIMIZATION & MANUAL REROUTING APIS
+# ==========================================
+
+@router.post("/kinematics/optimize-path")
+async def optimize_harvest_path(req: OptimizePathRequest):
+    """
+    Mathematical Optimizer: Evaluates 36 sweep angles across the field polygon,
+    computes global minimum-turn angle theta*, synthesizes Dubins turn trajectories,
+    and balances workload across the active fleet.
+    """
+    preset = FIELD_PRESETS.get(req.field_id, FIELD_PRESETS["FIELD_NE_LOT_4B"])
+    res = ws_manager.replan_fleet_trajectories(
+        polygon_coords=preset.coordinates_polygon,
+        crop_type=req.crop_type or preset.crop_type,
+        custom_sweep_angle_deg=None # Automatically solve for global optimum
+    )
+
+    await ws_manager.broadcast_json({
+        "type": "PATH_OPTIMIZED",
+        "telemetry": ws_manager.get_telemetry_payload(),
+        "multi_unit_plans": ws_manager.multi_unit_plans,
+        "fleet_makespan_minutes": ws_manager.fleet_makespan_minutes,
+        "time_savings_pct": ws_manager.time_savings_pct,
+        "optimal_angle_deg": res.get("optimal_sweep_angle_deg", 0.0),
+        "optimization_metrics": res.get("optimization_metrics", {})
+    })
+
+    return {
+        "status": "OPTIMIZED_PATH_APPLIED",
+        "optimal_sweep_angle_deg": res.get("optimal_sweep_angle_deg", 0.0),
+        "fleet_makespan_minutes": res.get("fleet_makespan_minutes", 38.5),
+        "time_savings_pct": res.get("time_savings_pct", 0.0),
+        "swaths_count": res.get("swaths_count", 10),
+        "optimization_metrics": res.get("optimization_metrics", {}),
+        "unit_plans": ws_manager.multi_unit_plans,
+    }
+
+
+@router.post("/kinematics/manual-reroute")
+async def manual_reroute_path(req: ManualRerouteRequest):
+    """
+    Manual Reroute: Allows the human operator to set a custom AB sweep angle (0-180 deg)
+    or supply custom edited waypoints, with real-time recalculation of efficiency deltas.
+    """
+    preset = FIELD_PRESETS.get(req.field_id, FIELD_PRESETS["FIELD_NE_LOT_4B"])
+    
+    if req.custom_waypoints and req.unit_id:
+        # Point-by-point manual drag override
+        res = ws_manager.apply_custom_waypoints(req.unit_id, req.custom_waypoints)
+    else:
+        # Angle sweep override
+        res = ws_manager.replan_fleet_trajectories(
+            polygon_coords=preset.coordinates_polygon,
+            crop_type=preset.crop_type,
+            custom_sweep_angle_deg=req.custom_sweep_angle_deg
+        )
+
+    await ws_manager.broadcast_json({
+        "type": "MANUAL_REROUTE_APPLIED",
+        "telemetry": ws_manager.get_telemetry_payload(),
+        "multi_unit_plans": ws_manager.multi_unit_plans,
+        "fleet_makespan_minutes": ws_manager.fleet_makespan_minutes,
+        "active_sweep_angle_deg": req.custom_sweep_angle_deg or 0.0,
+        "is_manual_override": True,
+    })
+
+    return {
+        "status": "MANUAL_REROUTE_APPLIED",
+        "active_sweep_angle_deg": req.custom_sweep_angle_deg,
+        "fleet_makespan_minutes": ws_manager.fleet_makespan_minutes,
+        "time_savings_pct": ws_manager.time_savings_pct,
+        "is_manual_override": True,
+        "unit_plans": ws_manager.multi_unit_plans,
+    }
+
 
 
 # ==========================================

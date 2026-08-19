@@ -172,10 +172,16 @@ class WebSocketManager:
             [-96.812, 41.248],
         ]
 
-    def replan_fleet_trajectories(self, polygon_coords: Optional[List[List[float]]] = None, crop_type: Optional[str] = None):
+    def replan_fleet_trajectories(
+        self,
+        polygon_coords: Optional[List[List[float]]] = None,
+        crop_type: Optional[str] = None,
+        custom_sweep_angle_deg: Optional[float] = None
+    ) -> Dict[str, Any]:
         """
         Executes Multi-Robot Coverage Path Planning (m-CPP) with dynamic area partitioning.
-        Equalizes makespan across all harvesters and synthesizes specialized auxiliary paths.
+        If custom_sweep_angle_deg is provided, builds manual paths along that angle;
+        otherwise runs mathematical optimization solver to compute global minimum-turn angle.
         """
         poly = polygon_coords or self.get_field_polygon()
         crop = crop_type or (self.current_plan.get("crop_type") if self.current_plan else "WHEAT_HARD_RED")
@@ -183,12 +189,17 @@ class WebSocketManager:
         mcpp_res = self.kinematics.generate_multi_unit_coverage_plans(
             polygon_coords=poly,
             crop_type=crop,
-            deployed_units=self.deployed_units
+            deployed_units=self.deployed_units,
+            custom_sweep_angle_deg=custom_sweep_angle_deg
         )
 
         self.multi_unit_plans = mcpp_res.get("unit_plans", {})
         self.fleet_makespan_minutes = mcpp_res.get("fleet_makespan_minutes", 38.5)
         self.time_savings_pct = mcpp_res.get("time_savings_pct", 0.0)
+        self.active_sweep_angle_deg = mcpp_res.get("active_sweep_angle_deg", 0.0)
+        self.optimal_sweep_angle_deg = mcpp_res.get("optimal_sweep_angle_deg", 0.0)
+        self.is_manual_override = mcpp_res.get("is_manual_override", False)
+        self.optimization_metrics = mcpp_res.get("optimization_metrics", {})
 
         # Update or initialize trackers for each deployed unit
         for unit in self.deployed_units:
@@ -200,8 +211,8 @@ class WebSocketManager:
                 unit["sub_polygon"] = plan["sub_polygon"]
                 unit["swaths_count"] = plan["swaths_count"]
                 unit["total_distance_km"] = plan["total_distance_km"]
+                unit["sweep_angle_deg"] = plan.get("sweep_angle_deg", self.active_sweep_angle_deg)
 
-                # If tracker does not exist, initialize it
                 if unit_id not in self.unit_trackers:
                     self.unit_trackers[unit_id] = {
                         "wp_idx": 0,
@@ -216,6 +227,25 @@ class WebSocketManager:
             self.waypoints = primary_plan["waypoints"]
         else:
             self.waypoints = mcpp_res.get("waypoints", [])
+
+        return mcpp_res
+
+    def apply_custom_waypoints(self, unit_id: str, custom_waypoints: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Applies manually dragged / custom edited waypoints to a specific unit.
+        """
+        res = self.kinematics.reroute_with_custom_waypoints(unit_id, custom_waypoints, self.speed_kmh)
+        if unit_id in self.multi_unit_plans:
+            self.multi_unit_plans[unit_id]["waypoints"] = res["waypoints"]
+            self.multi_unit_plans[unit_id]["total_distance_km"] = res["total_distance_km"]
+            self.multi_unit_plans[unit_id]["eta_minutes"] = res["eta_minutes"]
+
+        if unit_id == self.harvester_id:
+            self.waypoints = res["waypoints"]
+
+        self.is_manual_override = True
+        return res
+
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()

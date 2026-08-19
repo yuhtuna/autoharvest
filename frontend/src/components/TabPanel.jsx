@@ -24,9 +24,19 @@ import {
   Scan,
   Download,
   Plus,
-  Trash2
+  Trash2,
+  Sliders,
+  Sparkles,
+  Navigation
 } from "lucide-react";
-import { deployUnit, createHarvestZone, deleteUnit, deleteHarvestZone } from "../services/api";
+import { 
+  deployUnit, 
+  createHarvestZone, 
+  deleteUnit, 
+  deleteHarvestZone,
+  optimizeHarvestPath,
+  manualReroutePath
+} from "../services/api";
 
 const UNIT_OPTIONS = [
   { type: "RECON_DRONE", name: "Recon Drone Alpha", icon: <Radio size={14} />, defaultName: "DJI Agras T40 Drone", color: "#38bdf8" },
@@ -53,6 +63,11 @@ export function TabPanel({
 }) {
   const [expandedAgentIdx, setExpandedAgentIdx] = useState(null);
 
+  // Path Optimization & Manual Rerouting State
+  const [manualAngle, setManualAngle] = useState(0);
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [isRerouting, setIsRerouting] = useState(false);
+
   // Fleet Deploy Form State
   const [selectedUnitType, setSelectedUnitType] = useState("RECON_DRONE");
   const [unitCallsign, setUnitCallsign] = useState("DJI Agras T40 Drone");
@@ -63,6 +78,7 @@ export function TabPanel({
   const [zoneType, setZoneType] = useState("PRIORITY_HARVEST");
   const [zoneName, setZoneName] = useState("High-Brix Priority Sector");
   const [isCreatingZone, setIsCreatingZone] = useState(false);
+
 
   const isOrchard = telemetry?.is_orchard || currentFieldPreset?.crop_type?.includes("APPLE") || currentFieldPreset?.crop_type?.includes("GRAPE");
   const isEstop = telemetry?.e_stop_active || false;
@@ -106,6 +122,38 @@ export function TabPanel({
     }
   };
 
+  // Handle Mathematical Path Optimization
+  const handleOptimizePath = async () => {
+    setIsOptimizing(true);
+    try {
+      const res = await optimizeHarvestPath(currentFieldPreset?.id, currentFieldPreset?.crop_type);
+      if (res?.optimal_sweep_angle_deg !== undefined) {
+        setManualAngle(res.optimal_sweep_angle_deg);
+      }
+    } catch (err) {
+      console.error("Optimize path error:", err);
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
+  // Handle Manual Sweep Angle Slider Reroute
+  const handleAngleChange = async (newAngle) => {
+    const deg = parseFloat(newAngle);
+    setManualAngle(deg);
+    setIsRerouting(true);
+    try {
+      await manualReroutePath({
+        fieldId: currentFieldPreset?.id,
+        customSweepAngleDeg: deg
+      });
+    } catch (err) {
+      console.error("Manual reroute error:", err);
+    } finally {
+      setIsRerouting(false);
+    }
+  };
+
   // Handle Create Zone
   const handleCreateZone = async (e) => {
     e?.preventDefault();
@@ -135,6 +183,7 @@ export function TabPanel({
       setIsCreatingZone(false);
     }
   };
+
 
   return (
     <aside className="tabbed-sidebar">
@@ -356,12 +405,70 @@ export function TabPanel({
               </div>
             </div>
 
+            {/* Kinematics Path Optimization & Manual Rerouting Module */}
+            <div className="clean-card">
+              <div className="clean-card-title">
+                <span>Path Guidance & Optimization</span>
+                <Sliders size={13} color="var(--text-muted)" />
+              </div>
+
+              {/* Auto-Optimize CTA Button */}
+              <button
+                onClick={handleOptimizePath}
+                disabled={isOptimizing}
+                className="btn-clean btn-clean-primary"
+                style={{ width: "100%", padding: "8px 12px", marginBottom: "10px", justifyContent: "center" }}
+              >
+                <Sparkles size={14} />
+                <span>{isOptimizing ? "Solving Optimal Angle & Swaths..." : "⚡ Auto-Optimize Path (Minimal Turns)"}</span>
+              </button>
+
+              {/* Manual Sweep Heading Angle Slider */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "8px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem" }}>
+                  <span className="metric-label">Manual Sweep Heading</span>
+                  <span className="mono" style={{ color: "var(--color-brand)", fontWeight: 700 }}>
+                    {manualAngle}° {manualAngle === (telemetry?.optimal_sweep_angle_deg ?? 0) ? "(Optimal)" : "(Custom)"}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="175"
+                  step="5"
+                  value={manualAngle}
+                  onChange={(e) => handleAngleChange(e.target.value)}
+                  style={{ width: "100%", accentColor: "var(--color-brand)", cursor: "pointer" }}
+                />
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.62rem", color: "var(--text-muted)" }}>
+                  <span>0° (North-South)</span>
+                  <span>90° (East-West)</span>
+                  <span>175°</span>
+                </div>
+              </div>
+
+              {/* Optimization Benchmark Summary */}
+              <div style={{ padding: "6px 8px", background: "rgba(0,0,0,0.3)", borderRadius: "4px", border: "1px solid var(--border-subtle)", fontSize: "0.68rem" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
+                  <span style={{ color: "var(--text-muted)" }}>Solver State:</span>
+                  <span style={{ color: telemetry?.is_manual_override ? "var(--color-amber)" : "var(--color-brand)", fontWeight: 600 }}>
+                    {telemetry?.is_manual_override ? "MANUAL OVERRIDE" : "MATHEMATICALLY OPTIMIZED"}
+                  </span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--text-secondary)" }}>
+                  <span>Best Turning Axis: {telemetry?.optimal_sweep_angle_deg ?? 0}°</span>
+                  <span>Dubins Headland Arcs: Active</span>
+                </div>
+              </div>
+            </div>
+
             {/* Inline Unit Deploy Form */}
             <div className="clean-card">
               <div className="clean-card-title">
                 <span>Deploy Unit (Auto-Replans Paths)</span>
                 <Plus size={13} color="var(--text-muted)" />
               </div>
+
 
               <form onSubmit={handleDeployUnit} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 <div>

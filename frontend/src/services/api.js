@@ -163,6 +163,37 @@ export async function deleteHarvestZone(zoneId) {
   return res.json();
 }
 
+export async function optimizeHarvestPath(fieldId = "FIELD_NE_LOT_4B", cropType = "WHEAT_HARD_RED") {
+  const res = await fetch(`${API_BASE}/kinematics/optimize-path`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ field_id: fieldId, crop_type: cropType }),
+  });
+  if (!res.ok) throw new Error("Failed to optimize harvest path");
+  return res.json();
+}
+
+export async function manualReroutePath({
+  fieldId = "FIELD_NE_LOT_4B",
+  customSweepAngleDeg = null,
+  customWaypoints = null,
+  unitId = null,
+}) {
+  const res = await fetch(`${API_BASE}/kinematics/manual-reroute`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      field_id: fieldId,
+      custom_sweep_angle_deg: customSweepAngleDeg,
+      custom_waypoints: customWaypoints,
+      unit_id: unitId,
+    }),
+  });
+  if (!res.ok) throw new Error("Failed to apply manual path reroute");
+  return res.json();
+}
+
+
 
 
 
