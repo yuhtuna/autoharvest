@@ -11,6 +11,8 @@ import {
   AlertTriangle, 
   RotateCcw 
 } from "lucide-react";
+import { deleteUnit, deleteHarvestZone } from "../services/api";
+
 
 export function CleanTelemetrySidebar({
   telemetry,
@@ -279,6 +281,98 @@ export function CleanTelemetrySidebar({
         })}
 
       </div>
+
+      {/* 3.5 Active Deployed Units & Mapped Zones */}
+      <div className="clean-card">
+        <div className="clean-card-title">
+          <span>Active Deployments & Zones</span>
+          <span style={{ fontSize: "0.64rem", color: "#34d399", fontWeight: 700 }}>
+            {(telemetry?.deployed_units?.length || 0) + (telemetry?.harvest_zones?.length || 0)} Active
+          </span>
+        </div>
+
+        {/* Deployed Units List */}
+        <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--text-secondary)", marginBottom: "4px", marginTop: "2px" }}>
+          FLEET UNITS ({telemetry?.deployed_units?.length || 0})
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "8px" }}>
+          {telemetry?.deployed_units?.map((u) => (
+            <div 
+              key={u.id} 
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "4px 6px",
+                borderRadius: "5px",
+                background: "rgba(17, 24, 39, 0.6)",
+                border: "1px solid rgba(255,255,255,0.06)",
+                fontSize: "0.68rem"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: u.color || "#38bdf8" }} />
+                <span style={{ color: "#f3f4f6", fontWeight: 600 }}>{u.unit_name}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ fontSize: "0.62rem", color: "var(--text-muted)" }}>{u.status}</span>
+                {u.unit_type !== "COMBINE_HARVESTER" && (
+                  <button
+                    onClick={async () => {
+                      try { await deleteUnit(u.id); } catch (e) { console.error(e); }
+                    }}
+                    style={{ background: "none", border: "none", color: "#f87171", cursor: "pointer", padding: "1px 3px" }}
+                    title="Remove unit"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Mapped Zones List */}
+        <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--text-secondary)", marginBottom: "4px" }}>
+          HARVEST ZONES ({telemetry?.harvest_zones?.length || 0})
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+          {telemetry?.harvest_zones?.map((z) => (
+            <div 
+              key={z.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "4px 6px",
+                borderRadius: "5px",
+                background: "rgba(17, 24, 39, 0.6)",
+                border: `1px solid ${z.color_hex}44`,
+                fontSize: "0.68rem"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ width: "7px", height: "7px", borderRadius: "2px", background: z.color_hex || "#10b981" }} />
+                <span style={{ color: z.color_hex || "#10b981", fontWeight: 600 }}>{z.name}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span className="mono" style={{ fontSize: "0.62rem", color: "var(--text-muted)" }}>{z.area_hectares} ha</span>
+                <button
+                  onClick={async () => {
+                    try { await deleteHarvestZone(z.id); } catch (e) { console.error(e); }
+                  }}
+                  style={{ background: "none", border: "none", color: "#f87171", cursor: "pointer", padding: "1px 3px" }}
+                  title="Remove zone"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+      </div>
+
 
 
 

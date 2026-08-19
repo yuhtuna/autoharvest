@@ -109,79 +109,59 @@ export async function fetchBedrockStatus() {
   return res.json();
 }
 
-export async function deployFleetUnit({ unitType, label, position, assignedTask }) {
-  const res = await fetch(`${API_BASE}/deploy-unit`, {
+export async function fetchDeployedUnits() {
+  const res = await fetch(`${API_BASE}/units`);
+  if (!res.ok) throw new Error("Failed to fetch units");
+  return res.json();
+}
+
+export async function deployUnit(unitType, unitName, position, assignedZoneId = null) {
+  const res = await fetch(`${API_BASE}/units`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       unit_type: unitType,
-      label,
-      position,
-      assigned_task: assignedTask,
+      unit_name: unitName,
+      initial_position: position,
+      assigned_zone_id: assignedZoneId,
     }),
   });
   if (!res.ok) throw new Error("Failed to deploy unit");
   return res.json();
 }
 
-export async function removeFleetUnit(unitId) {
-  const res = await fetch(`${API_BASE}/remove-unit`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ unit_id: unitId }),
-  });
+export async function deleteUnit(unitId) {
+  const res = await fetch(`${API_BASE}/units/${unitId}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to remove unit");
   return res.json();
 }
 
-export async function mapHarvestZone({ polygonCoords, cropType, fieldName, soilMoisturePct, soilTempC }) {
-  const res = await fetch(`${API_BASE}/map-harvest-zone`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      polygon_coords: polygonCoords,
-      crop_type: cropType,
-      field_name: fieldName,
-      soil_moisture_pct: soilMoisturePct,
-      soil_temp_c: soilTempC,
-    }),
-  });
-  if (!res.ok) throw new Error("Failed to map harvest zone");
-  return res.json();
-}
-
-export async function fetchZones() {
+export async function fetchHarvestZones() {
   const res = await fetch(`${API_BASE}/zones`);
   if (!res.ok) throw new Error("Failed to fetch zones");
   return res.json();
 }
 
-export async function createZone({ name, polygon, cropType }) {
+export async function createHarvestZone(name, zoneType, colorHex, polygon) {
   const res = await fetch(`${API_BASE}/zones`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, polygon, crop_type: cropType }),
+    body: JSON.stringify({
+      name,
+      zone_type: zoneType,
+      color_hex: colorHex,
+      coordinates_polygon: polygon,
+    }),
   });
-  if (!res.ok) throw new Error("Failed to create zone");
+  if (!res.ok) throw new Error("Failed to map zone");
   return res.json();
 }
 
-export async function deleteZone(zoneId) {
-  const res = await fetch(`${API_BASE}/zones/${zoneId}`, {
-    method: "DELETE",
-  });
-  if (!res.ok) throw new Error("Failed to delete zone");
+export async function deleteHarvestZone(zoneId) {
+  const res = await fetch(`${API_BASE}/zones/${zoneId}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to remove zone");
   return res.json();
 }
-
-export async function activateZone(zoneId) {
-  const res = await fetch(`${API_BASE}/zones/${zoneId}/activate`, {
-    method: "POST",
-  });
-  if (!res.ok) throw new Error("Failed to activate zone");
-  return res.json();
-}
-
 
 
 

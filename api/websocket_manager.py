@@ -47,137 +47,86 @@ class WebSocketManager:
         self.gripper_cycles_cpm = 48.0
         self.suction_kpa = 85.0
         self.fuel_level_pct = 88.5
+        self.rtk_drift_mm = 12.4
         self.cut_progress_pct = 0.0
         self.e_stop_active = False
         self.safety_alert = "GEOFENCE_ACTIVE_ALL_CLEAR"
-
-        # Structured Harvest Zones
-        self.zones: List[Dict[str, Any]] = [
-            {
-                "id": "ZONE_01",
-                "name": "North Basin (Sector A)",
-                "polygon": [
-                    [-96.812, 41.256],
-                    [-96.801, 41.256],
-                    [-96.801, 41.248],
-                    [-96.812, 41.248],
-                ],
-                "crop_type": "WHEAT_HARD_RED",
-                "area_ha": 48.5,
-                "status": "IN_PROGRESS",
-                "ripeness_brix": 14.8,
-                "color": "#10b981",
-            }
-        ]
-
-        # Multi-Unit Fleet Deployment & Purposeful Swarm State Machine
-        self.deployed_units: List[Dict[str, Any]] = [
-            {
-                "id": "COMBINE_01",
-                "type": "COMBINE",
-                "label": "John Deere X9 1100",
-                "position": [-96.81134, 41.2555],
-                "heading": 180.0,
-                "speed_kmh": 6.8,
-                "status": "AUTONOMOUS_HARVEST",
-                "role": "PRIMARY_SWATH_CUTTER",
-                "battery_pct": 88.5,
-            },
-            {
-                "id": "DRONE_SCOUT_01",
-                "type": "DRONE_SCOUT",
-                "label": "DJI Agras T50 UAV",
-                "position": [-96.806, 41.253],
-                "heading": 90.0,
-                "speed_kmh": 18.5,
-                "status": "RECON_SURVEY",
-                "role": "THERMAL_NDVI_MAPPING",
-                "battery_pct": 94.0,
-                "altitude_m": 45,
-                "mission_mode": "LAWNMOWER_SURVEY",
-                "survey_step": 0.0,
-            },
-            {
-                "id": "GRAIN_CART_01",
-                "type": "GRAIN_CART",
-                "label": "Brent 1596 Grain Cart",
-                "position": [-96.802, 41.255],
-                "heading": 270.0,
-                "speed_kmh": 0.0,
-                "status": "STAGING_AT_DEPOT",
-                "role": "CHASER_UNLOAD",
-                "battery_pct": 99.0,
-                "cart_capacity_pct": 0.0,
-            }
-        ]
 
         # Active Obstacles / Chaos
         self.active_obstacle: Optional[Dict[str, Any]] = None
         self.active_scenario = "NORMAL_HARVEST"
         self.loop_task: Optional[asyncio.Task] = None
 
-    def add_zone(self, name: str, polygon: List[List[float]], crop_type: str = "WHEAT_HARD_RED") -> Dict[str, Any]:
-        """Creates and indexes a new field partition zone."""
-        lons = [p[0] for p in polygon]
-        lats = [p[1] for p in polygon]
-        d_lon_m = (max(lons) - min(lons)) * 84000.0
-        d_lat_m = (max(lats) - min(lats)) * 111000.0
-        area_ha = round(max(1.5, (d_lon_m * d_lat_m) / 10000.0), 1)
+        # Multi-Unit Deployment & Harvest Zones state
+        self.deployed_units: List[Dict[str, Any]] = [
+            {
+                "id": "UNIT_COMBINE_01",
+                "unit_type": "COMBINE_HARVESTER",
+                "unit_name": "John Deere X9 Combine",
+                "position": [-96.81134, 41.2555],
+                "heading_deg": 180.0,
+                "status": "HARVESTING_ACTIVE",
+                "color": "#fbbf24",
+            },
+            {
+                "id": "UNIT_DRONE_01",
+                "unit_type": "RECON_DRONE",
+                "unit_name": "DJI Agras Recon Drone Alpha",
+                "position": [-96.805, 41.253],
+                "heading_deg": 45.0,
+                "status": "MULTISPECTRAL_SCANNING",
+                "color": "#38bdf8",
+            },
+            {
+                "id": "UNIT_HUMAN_CREW_01",
+                "unit_type": "HUMAN_FIELD_CREW",
+                "unit_name": "Human Select Pick Crew #4",
+                "position": [-96.809, 41.250],
+                "heading_deg": 0.0,
+                "status": "SELECTIVE_HAND_PRUNING",
+                "color": "#34d399",
+            },
+            {
+                "id": "UNIT_GRAIN_CART_01",
+                "unit_type": "GRAIN_CHASER_CART",
+                "unit_name": "Autonomous Grain Cart #1",
+                "position": [-96.8118, 41.2552],
+                "heading_deg": 180.0,
+                "status": "CHASER_STANDBY",
+                "color": "#a7f3d0",
+            },
+        ]
 
-        zone_idx = len(self.zones) + 1
-        new_zone = {
-            "id": f"ZONE_{zone_idx:02d}",
-            "name": name or f"Harvest Sector {chr(64 + zone_idx)}",
-            "polygon": polygon,
-            "crop_type": crop_type,
-            "area_ha": area_ha,
-            "status": "PLANNED",
-            "ripeness_brix": 14.5,
-            "color": ["#10b981", "#38bdf8", "#f59e0b", "#a855f7"][zone_idx % 4],
-        }
-        self.zones.append(new_zone)
-        return new_zone
-
-    def delete_zone(self, zone_id: str) -> bool:
-        """Deletes a custom zone by ID."""
-        init_len = len(self.zones)
-        self.zones = [z for z in self.zones if z["id"] != zone_id]
-        return len(self.zones) < init_len
-
-    def deploy_unit(self, unit_type: str, label: str, position: Optional[List[float]] = None, task: str = "AUTONOMOUS_OPERATION") -> Dict[str, Any]:
-        """Deploys a new autonomous machine, drone, or human crew into the live mission."""
-        unit_count = len([u for u in self.deployed_units if u["type"] == unit_type]) + 1
-        unit_id = f"{unit_type}_{unit_count:02d}"
-
-        # If no position specified, spawn near current field center with slight offset
-        if not position:
-            offset_lon = (unit_count * 0.0012) * (-1 if unit_count % 2 == 0 else 1)
-            offset_lat = (unit_count * 0.0008) * (1 if unit_count % 2 == 0 else -1)
-            position = [self.current_pos[0] + offset_lon, self.current_pos[1] + offset_lat]
-
-        speed = 18.5 if unit_type == "DRONE_SCOUT" else (4.5 if unit_type == "HUMAN_CREW" else 6.2)
-
-        new_unit = {
-            "id": unit_id,
-            "type": unit_type,
-            "label": label or f"{unit_type.replace('_', ' ').title()} {unit_count}",
-            "position": position,
-            "heading": random.uniform(0, 360),
-            "speed_kmh": speed,
-            "status": "DEPLOYED_ACTIVE",
-            "role": task or "FIELD_SUPPORT",
-            "battery_pct": 98.0,
-        }
-
-        self.deployed_units.append(new_unit)
-        print(f"[FleetManager] Deployed unit {unit_id} ({unit_type}) at {position}")
-        return new_unit
-
-    def remove_unit(self, unit_id: str) -> bool:
-        """Removes a deployed unit from the active swarm."""
-        initial_len = len(self.deployed_units)
-        self.deployed_units = [u for u in self.deployed_units if u["id"] != unit_id]
-        return len(self.deployed_units) < initial_len
+        self.harvest_zones: List[Dict[str, Any]] = [
+            {
+                "id": "ZONE_PRIORITY_A",
+                "name": "Zone A: Peak Sugar Harvest Sector",
+                "zone_type": "PRIORITY_HARVEST",
+                "color_hex": "#10b981",
+                "coordinates_polygon": [
+                    [-96.811, 41.255],
+                    [-96.806, 41.255],
+                    [-96.806, 41.251],
+                    [-96.811, 41.251],
+                ],
+                "area_hectares": 18.5,
+                "status": "ACTIVE_HARVEST",
+            },
+            {
+                "id": "ZONE_BLIGHT_QUARANTINE",
+                "name": "Zone B: Fungal Blight Isolation",
+                "zone_type": "QUARANTINE_BLIGHT",
+                "color_hex": "#ef4444",
+                "coordinates_polygon": [
+                    [-96.805, 41.254],
+                    [-96.802, 41.254],
+                    [-96.802, 41.250],
+                    [-96.805, 41.250],
+                ],
+                "area_hectares": 6.2,
+                "status": "BIO_FUNGICIDE_TREATMENT",
+            },
+        ]
 
 
     async def connect(self, websocket: WebSocket):
@@ -203,13 +152,13 @@ class WebSocketManager:
             "timestamp": time.time(),
             "field_id": self.current_field_id,
             "telemetry": self.get_telemetry_payload(),
-            "deployed_units": self.deployed_units,
-            "zones": self.zones,
             "active_scenario": self.active_scenario,
             "active_obstacle": self.active_obstacle,
             "is_running": self.is_running,
             "is_paused": self.is_paused,
             "current_plan": self.current_plan,
+            "deployed_units": self.deployed_units,
+            "harvest_zones": self.harvest_zones,
         }
         try:
             await websocket.send_text(json.dumps(snapshot))
@@ -217,6 +166,12 @@ class WebSocketManager:
             pass
 
     def get_telemetry_payload(self) -> Dict[str, Any]:
+        # Sync primary combine position into deployed_units list
+        for u in self.deployed_units:
+            if u["unit_type"] == "COMBINE_HARVESTER":
+                u["position"] = self.current_pos
+                u["heading_deg"] = round(self.heading, 1)
+
         return {
             "harvester_id": self.harvester_id,
             "fleet_mode": self.fleet_mode,
@@ -239,9 +194,54 @@ class WebSocketManager:
             "current_waypoint_idx": self.current_waypoint_idx,
             "total_waypoints": len(self.waypoints),
             "deployed_units": self.deployed_units,
-            "zones": self.zones,
+            "harvest_zones": self.harvest_zones,
         }
 
+    def deploy_unit(self, unit_type: str, unit_name: str, position: List[float], assigned_zone_id: Optional[str] = None) -> Dict[str, Any]:
+        unit_id = f"UNIT_{unit_type}_{len(self.deployed_units) + 1}"
+        color_map = {
+            "COMBINE_HARVESTER": "#fbbf24",
+            "RECON_DRONE": "#38bdf8",
+            "ROBOTIC_PICKER": "#c084fc",
+            "GRAIN_CHASER_CART": "#a7f3d0",
+            "HUMAN_FIELD_CREW": "#34d399",
+        }
+        new_unit = {
+            "id": unit_id,
+            "unit_type": unit_type,
+            "unit_name": unit_name,
+            "position": position,
+            "heading_deg": random.choice([0.0, 45.0, 90.0, 180.0, 270.0]),
+            "status": "DEPLOYED_ACTIVE",
+            "assigned_zone_id": assigned_zone_id,
+            "color": color_map.get(unit_type, "#38bdf8"),
+        }
+        self.deployed_units.append(new_unit)
+        return new_unit
+
+    def remove_unit(self, unit_id: str) -> bool:
+        initial_len = len(self.deployed_units)
+        self.deployed_units = [u for u in self.deployed_units if u["id"] != unit_id]
+        return len(self.deployed_units) < initial_len
+
+    def add_harvest_zone(self, name: str, zone_type: str, color_hex: str, polygon: List[List[float]]) -> Dict[str, Any]:
+        zone_id = f"ZONE_{len(self.harvest_zones) + 1}"
+        new_zone = {
+            "id": zone_id,
+            "name": name,
+            "zone_type": zone_type,
+            "color_hex": color_hex or "#10b981",
+            "coordinates_polygon": polygon,
+            "area_hectares": round(random.uniform(5.0, 25.0), 1),
+            "status": "MAPPED_ACTIVE",
+        }
+        self.harvest_zones.append(new_zone)
+        return new_zone
+
+    def remove_harvest_zone(self, zone_id: str) -> bool:
+        initial_len = len(self.harvest_zones)
+        self.harvest_zones = [z for z in self.harvest_zones if z["id"] != zone_id]
+        return len(self.harvest_zones) < initial_len
 
 
     def load_mission_plan(self, plan: Dict[str, Any]):
@@ -414,52 +414,6 @@ class WebSocketManager:
                                 self.safety_alert = f"ESTOP_TRIGGERED_{self.active_obstacle['type']}"
                                 self.speed_kmh = 0.0
 
-                    # Dynamically update other deployed swarm units
-                    t_now = time.time()
-                    for unit in self.deployed_units:
-                        if unit.get("type") == "DRONE_SCOUT":
-                            # Lawnmower recon survey flight across parcel
-                            step = (t_now * 0.04) % 1.0
-                            transect_idx = int(step * 4)
-                            transect_prog = (step * 4) % 1.0
-                            
-                            # Field bounds default
-                            f_min_lon, f_max_lon = -96.812, -96.801
-                            f_min_lat, f_max_lat = 41.248, 41.256
-                            
-                            if transect_idx % 2 == 0:
-                                d_lon = f_min_lon + transect_prog * (f_max_lon - f_min_lon)
-                                d_hdg = 90.0
-                            else:
-                                d_lon = f_max_lon - transect_prog * (f_max_lon - f_min_lon)
-                                d_hdg = 270.0
-                            
-                            d_lat = f_max_lat - (transect_idx / 4.0) * (f_max_lat - f_min_lat) - 0.001
-                            unit["position"] = [round(d_lon, 6), round(d_lat, 6)]
-                            unit["heading"] = d_hdg
-                            unit["status"] = f"RECON SWEEP (TRANSECT {transect_idx + 1}/4)"
-                            unit["battery_pct"] = max(10.0, unit.get("battery_pct", 98.0) - 0.001)
-
-                        elif unit.get("type") == "GRAIN_CART" and unit.get("id") != "COMBINE_01":
-                            # Smart rendezvous: only approach combine when hopper > 60%
-                            if self.grain_tank_pct >= 60.0:
-                                # Intercept and shadow combine
-                                cart_offset_x = -0.00035
-                                cart_offset_y = 0.00015
-                                unit["position"] = [self.current_pos[0] + cart_offset_x, self.current_pos[1] + cart_offset_y]
-                                unit["heading"] = self.heading
-                                unit["speed_kmh"] = self.speed_kmh
-                                unit["status"] = "UNLOAD_ON_THE_GO"
-                                unit["cart_capacity_pct"] = min(100.0, unit.get("cart_capacity_pct", 0.0) + 0.08)
-                                # Drain combine tank into cart
-                                self.grain_tank_pct = max(10.0, self.grain_tank_pct - 0.06)
-                            else:
-                                # Staged at field headland depot
-                                unit["position"] = [-96.802, 41.255]
-                                unit["heading"] = 270.0
-                                unit["speed_kmh"] = 0.0
-                                unit["status"] = "STAGING_AT_DEPOT"
-
                 # Broadcast telemetry packet
                 if self.active_connections:
                     telemetry_msg = {
@@ -467,14 +421,12 @@ class WebSocketManager:
                         "timestamp": time.time(),
                         "telemetry": self.get_telemetry_payload(),
                     }
-
                     await self.broadcast_json(telemetry_msg)
 
             except Exception as e:
                 pass
 
             await asyncio.sleep(dt)
-
 
 
 # Global singleton instance

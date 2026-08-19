@@ -9,14 +9,17 @@ import {
   Crosshair, 
   Camera, 
   Compass,
-  Navigation,
-  Edit3,
-  Check,
-  X,
-  Shield,
+  Plus,
+  User,
   Radio,
-  Maximize2
+  Bot,
+  Truck,
+  ShieldAlert,
+  MapPin,
+  Sparkles,
+  Trash2
 } from "lucide-react";
+import { deployUnit, createHarvestZone, deleteUnit, deleteHarvestZone } from "../services/api";
 
 export function FieldMap2D({
   fieldPreset,
@@ -24,10 +27,6 @@ export function FieldMap2D({
   telemetry,
   activeObstacle,
   activeScenario,
-  zones = [],
-  isDrawingZone = false,
-  drawingPoints = [],
-  onAddDrawingPoint,
 }) {
   const canvasRef = useRef(null);
   
@@ -39,8 +38,15 @@ export function FieldMap2D({
   const [showCutTrail, setShowCutTrail] = useState(true);
   const [zoom, setZoom] = useState(1.0);
 
-  // 3D perspective animation tick
+  // Deployment Toolbars state
+  const [showDeployMenu, setShowDeployMenu] = useState(false);
+  const [showZoneMenu, setShowZoneMenu] = useState(false);
+  const [deployMode, setDeployMode] = useState(null); // 'RECON_DRONE', 'HUMAN_FIELD_CREW', 'COMBINE_HARVESTER', 'ROBOTIC_PICKER', 'GRAIN_CHASER_CART'
+  const [zoneMode, setZoneMode] = useState(null); // 'PRIORITY_HARVEST', 'QUARANTINE_BLIGHT', 'STAGING_HEADLAND'
+
+  // 3D Perspective Reel Animation Frame
   const animFrameRef = useRef(0);
+
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -59,16 +65,16 @@ export function FieldMap2D({
 
     ctx.clearRect(0, 0, width, height);
 
-    // =========================================================================
-    // 1. 3D FIRST-PERSON TRACTOR CAB / DRONE POV
-    // =========================================================================
+    // ==========================================
+    // 3D FIRST-PERSON TRACTOR CAB / DRONE POV
+    // ==========================================
     if (viewMode === "3D_CAB_POV") {
       animFrameRef.current = (animFrameRef.current + 1) % 360;
       const angle = (animFrameRef.current * Math.PI) / 30;
       const speed = telemetry?.speed_kmh ?? 6.8;
       const isOrchard = telemetry?.is_orchard || false;
 
-      // Sky & Horizon Gradient
+      // Sky & Horizon
       const skyGrad = ctx.createLinearGradient(0, 0, 0, height * 0.45);
       skyGrad.addColorStop(0, "#08101e");
       skyGrad.addColorStop(1, "#1e293b");
@@ -86,14 +92,14 @@ export function FieldMap2D({
       ctx.closePath();
       ctx.fill();
 
-      // Ground Perspective Field
+      // Ground Perspective Field (Soil / Crop Rows)
       const groundGrad = ctx.createLinearGradient(0, height * 0.45, 0, height);
       groundGrad.addColorStop(0, "#151b14");
       groundGrad.addColorStop(1, isOrchard ? "#1b2a1a" : "#2a2213");
       ctx.fillStyle = groundGrad;
       ctx.fillRect(0, height * 0.45, width, height * 0.55);
 
-      // Perspective Swath Lines
+      // Perspective Swath Lines rushing toward the cab
       const horizonY = height * 0.45;
       const centerX = width / 2;
       ctx.strokeStyle = isOrchard ? "rgba(56, 189, 248, 0.4)" : "rgba(245, 158, 11, 0.45)";
@@ -107,27 +113,52 @@ export function FieldMap2D({
         ctx.stroke();
       }
 
-      // Tractor Header / Robot Cutter
+      // Headlight Beam
+      const lightGrad = ctx.createRadialGradient(centerX, height - 20, 30, centerX, height * 0.45, width * 0.5);
+      lightGrad.addColorStop(0, "rgba(255, 255, 255, 0.25)");
+      lightGrad.addColorStop(1, "rgba(255, 255, 255, 0.0)");
+      ctx.fillStyle = lightGrad;
+      ctx.beginPath();
+      ctx.moveTo(centerX - 100, height);
+      ctx.lineTo(centerX + 100, height);
+      ctx.lineTo(centerX + 260, horizonY + 20);
+      ctx.lineTo(centerX - 260, horizonY + 20);
+      ctx.closePath();
+      ctx.fill();
+
+      // Combine Cutter Reel / Orchard Delta Gripper Mechanism (Foreground)
       if (isOrchard) {
+        // Robotic Picking Arms
         ctx.strokeStyle = "#38bdf8";
         ctx.lineWidth = 5;
+        // Left arm
         ctx.beginPath();
         ctx.moveTo(centerX - 140, height);
         ctx.lineTo(centerX - 90, height - 90 + Math.sin(angle) * 15);
         ctx.stroke();
+        // Right arm
         ctx.beginPath();
         ctx.moveTo(centerX + 140, height);
         ctx.lineTo(centerX + 90, height - 90 + Math.cos(angle) * 15);
         ctx.stroke();
+
+        // Suction Gripper Cups
+        ctx.fillStyle = "#fbbf24";
+        ctx.beginPath();
+        ctx.arc(centerX - 90, height - 90 + Math.sin(angle) * 15, 12, 0, Math.PI * 2);
+        ctx.arc(centerX + 90, height - 90 + Math.cos(angle) * 15, 12, 0, Math.PI * 2);
+        ctx.fill();
       } else {
+        // Rotating 30ft Header Reel
         const reelY = height - 70;
-        const reelWidth = Math.min(width * 0.7, 600);
+        const reelWidth = width * 0.65;
         const reelX = centerX - reelWidth / 2;
 
         ctx.strokeStyle = "#475569";
         ctx.lineWidth = 6;
         ctx.strokeRect(reelX, reelY, reelWidth, 24);
 
+        // Rotating Tines
         ctx.strokeStyle = "#fbbf24";
         ctx.lineWidth = 2.5;
         for (let t = 0; t < 12; t++) {
@@ -140,18 +171,24 @@ export function FieldMap2D({
         }
       }
 
-      // HUD Text
+      // Tractor Cab Dashboard Overlay
       ctx.fillStyle = "#0f172a";
       ctx.fillRect(0, height - 35, width, 35);
+      ctx.strokeStyle = "#1e293b";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(0, height - 35, width, 35);
+
+      // Cockpit HUD Text
       ctx.fillStyle = "#38bdf8";
       ctx.font = "bold 11px JetBrains Mono, monospace";
       ctx.fillText(`CAM-01 TRACTOR POV • SPEED: ${speed} km/h • HDG: ${telemetry?.heading_deg ?? 180}°`, 20, height - 14);
+
       return;
     }
 
-    // =========================================================================
-    // 2. 2D ISOTROPIC RADAR MAP (PROPORTIONAL, NON-STRETCHED)
-    // =========================================================================
+    // ==========================================
+    // 2D SATELLITE RADAR VIEW (DEFAULT)
+    // ==========================================
     const polygon = fieldPreset?.coordinates_polygon || [
       [-96.812, 41.256],
       [-96.801, 41.256],
@@ -166,368 +203,363 @@ export function FieldMap2D({
     const minLat = Math.min(...lats);
     const maxLat = Math.max(...lats);
 
-    const pad = 40;
-    const availW = Math.max(100, width - pad * 2);
-    const availH = Math.max(100, height - pad * 2);
-
-    // Isotropic aspect ratio computation (preserves true square/rectangle geometry)
-    const fieldSpanX_m = (maxLon - minLon) * 84000.0;
-    const fieldSpanY_m = (maxLat - minLat) * 111000.0;
-    const fieldAspect = fieldSpanX_m / (fieldSpanY_m || 1);
-    const canvasAspect = availW / availH;
-
-    let fitW, fitH;
-    if (canvasAspect > fieldAspect) {
-      fitH = availH;
-      fitW = availH * fieldAspect;
-    } else {
-      fitW = availW;
-      fitH = availW / (fieldAspect || 1);
-    }
-
-    const mapOriginX = (width - fitW) / 2;
-    const mapOriginY = (height - fitH) / 2;
+    const pad = 48;
+    const availW = width - pad * 2;
+    const availH = height - pad * 2;
 
     const toCanvasX = (lon) => {
-      const norm = (lon - minLon) / (maxLon - minLon || 1e-6);
-      return mapOriginX + norm * fitW;
+      const norm = (lon - minLon) / (maxLon - minLon);
+      const centerX = width / 2;
+      return centerX + (norm * availW - availW / 2) * zoom;
     };
 
     const toCanvasY = (lat) => {
-      const norm = (lat - minLat) / (maxLat - minLat || 1e-6);
-      return mapOriginY + (1 - norm) * fitH;
+      const norm = (lat - minLat) / (maxLat - minLat);
+      const centerY = height / 2;
+      return centerY + ((1 - norm) * availH - availH / 2) * zoom;
     };
 
-    const toLon = (x) => minLon + ((x - mapOriginX) / fitW) * (maxLon - minLon);
-    const toLat = (y) => minLat + (1 - (y - mapOriginY) / fitH) * (maxLat - minLat);
-
-    // Subtle background grid
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
-    ctx.lineWidth = 1;
-    for (let gx = 0; gx < width; gx += 40) {
-      ctx.beginPath();
-      ctx.moveTo(gx, 0);
-      ctx.lineTo(gx, height);
-      ctx.stroke();
-    }
-    for (let gy = 0; gy < height; gy += 40) {
-      ctx.beginPath();
-      ctx.moveTo(0, gy);
-      ctx.lineTo(width, gy);
-      ctx.stroke();
-    }
-
-    // A. Draw Base Soil / NDVI Layer
-    ctx.save();
+    // 1. Draw Field Background Grid & Boundary
+    ctx.fillStyle = "#0c131d";
     ctx.beginPath();
     polygon.forEach((pt, idx) => {
-      const cx = toCanvasX(pt[0]);
-      const cy = toCanvasY(pt[1]);
-      if (idx === 0) ctx.moveTo(cx, cy);
-      else ctx.lineTo(cx, cy);
+      const px = toCanvasX(pt[0]);
+      const py = toCanvasY(pt[1]);
+      if (idx === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
     });
     ctx.closePath();
-    ctx.clip();
+    ctx.fill();
 
-    // Base soil texture
-    ctx.fillStyle = telemetry?.is_orchard ? "#0f2015" : "#1a1610";
-    ctx.fillRect(mapOriginX - 10, mapOriginY - 10, fitW + 20, fitH + 20);
+    // 2. Draw NDVI Heatmap Raster Layer (if enabled)
+    const ndviMatrix = missionPlan?.vision_details?.ndvi_matrix;
+    if (showNDVI && ndviMatrix && ndviMatrix.length > 0) {
+      const gridRows = ndviMatrix.length;
+      const gridCols = ndviMatrix[0].length;
+      const stepX = (maxLon - minLon) / gridCols;
+      const stepY = (maxLat - minLat) / gridRows;
 
-    // NDVI Heatmap Grid Cells
-    if (showNDVI) {
-      const ndviCols = 24;
-      const ndviRows = 16;
-      const cellW = fitW / ndviCols;
-      const cellH = fitH / ndviRows;
+      for (let r = 0; r < gridRows; r++) {
+        for (let c = 0; c < gridCols; c++) {
+          const val = ndviMatrix[r][c];
+          const cellLon = minLon + c * stepX;
+          const cellLat = maxLat - r * stepY;
 
-      for (let r = 0; r < ndviRows; r++) {
-        for (let c = 0; c < ndviCols; c++) {
-          const noise = Math.sin(c * 0.45) * Math.cos(r * 0.5) + Math.sin((c + r) * 0.3);
-          const ndviVal = 0.55 + noise * 0.22;
+          const x0 = toCanvasX(cellLon);
+          const y0 = toCanvasY(cellLat);
+          const x1 = toCanvasX(cellLon + stepX);
+          const y1 = toCanvasY(cellLat - stepY);
 
-          let rCol = Math.floor(180 * (1 - ndviVal));
-          let gCol = Math.floor(120 + 110 * ndviVal);
-          let bCol = 30;
-
-          if (telemetry?.is_orchard) {
-            rCol = Math.floor(40 + 60 * (1 - ndviVal));
-            gCol = Math.floor(140 + 90 * ndviVal);
-            bCol = Math.floor(70 + 40 * ndviVal);
+          let color = "rgba(16, 185, 129, 0.4)";
+          if (val < 0.45) {
+            color = `rgba(239, 68, 68, ${0.45 + (0.45 - val) * 0.5})`;
+          } else if (val < 0.72) {
+            color = `rgba(245, 158, 11, ${0.35 + (0.72 - val) * 0.3})`;
+          } else {
+            color = `rgba(16, 185, 129, ${0.35 + (val - 0.72) * 0.5})`;
           }
 
-          ctx.fillStyle = `rgba(${rCol}, ${gCol}, ${bCol}, 0.28)`;
-          ctx.fillRect(mapOriginX + c * cellW, mapOriginY + r * cellH, cellW + 0.5, cellH + 0.5);
+          ctx.fillStyle = color;
+          ctx.fillRect(x0, y0, Math.ceil(x1 - x0) + 1, Math.ceil(y1 - y0) + 1);
         }
       }
     }
 
-    // B. Harvested Cut Trail Overlay
-    if (showCutTrail && missionPlan?.swaths) {
-      const progress = telemetry?.cut_progress_pct ?? 0.0;
-      const totalSwaths = missionPlan.swaths.length;
-      const cutSwathCount = Math.floor((progress / 100.0) * totalSwaths);
-
-      ctx.fillStyle = "rgba(10, 15, 25, 0.75)";
-      missionPlan.swaths.slice(0, cutSwathCount).forEach((swath) => {
-        const poly = swath.boundary_polygon || [
-          [swath.start_lon, swath.start_lat],
-          [swath.end_lon, swath.start_lat],
-          [swath.end_lon, swath.end_lat],
-          [swath.start_lon, swath.end_lat],
-        ];
-        ctx.beginPath();
-        poly.forEach((pt, pIdx) => {
-          const px = toCanvasX(pt[0]);
-          const py = toCanvasY(pt[1]);
-          if (pIdx === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        });
-        ctx.closePath();
-        ctx.fill();
-      });
+    // 3. Draw Headland Buffer Boundary
+    if (showHeadlands) {
+      const marginLon = (maxLon - minLon) * 0.06;
+      const marginLat = (maxLat - minLat) * 0.06;
+      ctx.strokeStyle = "rgba(245, 158, 11, 0.45)";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 6]);
+      ctx.strokeRect(
+        toCanvasX(minLon + marginLon),
+        toCanvasY(maxLat - marginLat),
+        toCanvasX(maxLon - marginLon) - toCanvasX(minLon + marginLon),
+        toCanvasY(minLat + marginLat) - toCanvasY(maxLat - marginLat)
+      );
+      ctx.setLineDash([]);
     }
 
-    ctx.restore();
-
-    // C. Field Boundary Outline
-    ctx.strokeStyle = "rgba(16, 185, 129, 0.65)";
-    ctx.lineWidth = 2;
-    ctx.setLineDash([6, 4]);
-    ctx.beginPath();
-    polygon.forEach((pt, idx) => {
-      const cx = toCanvasX(pt[0]);
-      const cy = toCanvasY(pt[1]);
-      if (idx === 0) ctx.moveTo(cx, cy);
-      else ctx.lineTo(cx, cy);
-    });
-    ctx.closePath();
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // D. Dubins Trajectory Swaths
-    if (showTrajectories && missionPlan?.dubins_turns) {
-      ctx.strokeStyle = "#fbbf24";
-      ctx.lineWidth = 2.2;
-      ctx.beginPath();
-      missionPlan.dubins_turns.forEach((turn, tIdx) => {
-        const turnPts = turn.arc_points || [];
-        turnPts.forEach((pt, pIdx) => {
-          const px = toCanvasX(pt[0]);
-          const py = toCanvasY(pt[1]);
-          if (tIdx === 0 && pIdx === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        });
-      });
-      ctx.stroke();
-    }
-
-    // E. Draw Defined Labeled Zones
-    zones.forEach((z) => {
-      if (!z.polygon || z.polygon.length < 3) return;
-      ctx.strokeStyle = z.color || "#38bdf8";
-      ctx.lineWidth = 2;
-      ctx.fillStyle = (z.color || "#38bdf8") + "22";
+    // 3.5 Draw Custom Mapped Harvest Zones (Priority, Quarantine, Staging)
+    const customZones = telemetry?.harvest_zones || [];
+    customZones.forEach((zone) => {
+      if (!zone.coordinates_polygon || zone.coordinates_polygon.length === 0) return;
+      ctx.fillStyle = zone.color_hex ? `${zone.color_hex}26` : "rgba(16, 185, 129, 0.15)";
+      ctx.strokeStyle = zone.color_hex || "#10b981";
+      ctx.lineWidth = 1.8;
+      ctx.setLineDash([4, 4]);
 
       ctx.beginPath();
-      z.polygon.forEach((pt, idx) => {
-        const px = toCanvasX(pt[0]);
-        const py = toCanvasY(pt[1]);
-        if (idx === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
+      zone.coordinates_polygon.forEach((pt, idx) => {
+        const zx = toCanvasX(pt[0]);
+        const zy = toCanvasY(pt[1]);
+        if (idx === 0) ctx.moveTo(zx, zy);
+        else ctx.lineTo(zx, zy);
       });
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
+      ctx.setLineDash([]);
 
-      // Draw Zone Label Centroid
-      const zLons = z.polygon.map(p => p[0]);
-      const zLats = z.polygon.map(p => p[1]);
-      const cLon = (Math.min(...zLons) + Math.max(...zLons)) / 2;
-      const cLat = (Math.min(...zLats) + Math.max(...zLats)) / 2;
-      const labelX = toCanvasX(cLon);
-      const labelY = toCanvasY(cLat);
+      // Draw Zone Label Tag
+      const zx0 = toCanvasX(zone.coordinates_polygon[0][0]);
+      const zy0 = toCanvasY(zone.coordinates_polygon[0][1]);
 
       ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
-      ctx.strokeStyle = z.color || "#38bdf8";
+      ctx.fillRect(zx0 + 4, zy0 + 4, 180, 20);
+      ctx.strokeStyle = zone.color_hex || "#10b981";
       ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.roundRect(labelX - 45, labelY - 11, 90, 22, 4);
-      ctx.fill();
-      ctx.stroke();
+      ctx.strokeRect(zx0 + 4, zy0 + 4, 180, 20);
 
-      ctx.fillStyle = "#ffffff";
+      ctx.fillStyle = zone.color_hex || "#10b981";
       ctx.font = "bold 9.5px JetBrains Mono, monospace";
-      ctx.textAlign = "center";
-      ctx.fillText(z.name || z.id, labelX, labelY + 3);
-      ctx.textAlign = "start";
+      ctx.fillText(`🗺️ ${zone.name}`, zx0 + 8, zy0 + 18);
     });
 
-    // F. Draw Active Drawing Points (Interactive Zone Creator)
-    if (isDrawingZone && drawingPoints.length > 0) {
-      ctx.strokeStyle = "#38bdf8";
-      ctx.lineWidth = 2.5;
-      ctx.fillStyle = "rgba(56, 189, 248, 0.2)";
 
+    // 4. Draw Waypoint Trajectory Paths
+    const waypoints = missionPlan?.kinematics_details?.waypoints || [];
+    const currentWpIdx = telemetry?.current_waypoint_idx || 0;
+
+    if (showTrajectories && waypoints.length > 1) {
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      drawingPoints.forEach((pt, idx) => {
-        const px = toCanvasX(pt[0]);
-        const py = toCanvasY(pt[1]);
-        if (idx === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
+      waypoints.forEach((wp, idx) => {
+        const wx = toCanvasX(wp.lon);
+        const wy = toCanvasY(wp.lat);
+        if (idx === 0) ctx.moveTo(wx, wy);
+        else ctx.lineTo(wx, wy);
       });
-      if (drawingPoints.length > 2) {
-        ctx.closePath();
-        ctx.fill();
-      }
       ctx.stroke();
 
-      // Numbered vertex circles
-      drawingPoints.forEach((pt, idx) => {
-        const px = toCanvasX(pt[0]);
-        const py = toCanvasY(pt[1]);
-
-        ctx.fillStyle = "#0284c7";
+      // Draw Planned Waypoint Dots
+      waypoints.forEach((wp, idx) => {
+        const wx = toCanvasX(wp.lon);
+        const wy = toCanvasY(wp.lat);
+        ctx.fillStyle = idx < currentWpIdx ? "#10b981" : "rgba(255, 255, 255, 0.35)";
         ctx.beginPath();
-        ctx.arc(px, py, 9, 0, Math.PI * 2);
+        ctx.arc(wx, wy, 2.5, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 10px Inter, sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(`${idx + 1}`, px, py + 3.5);
-        ctx.textAlign = "start";
       });
     }
 
-    // G. Draw Swarm Units (Combine, Drone with Recon Beam, Grain Cart, Human Crew)
-    const deployed = telemetry?.deployed_units || [];
-    const harvesterPos = telemetry?.position || polygon[0];
-    const hx = toCanvasX(harvesterPos[0]);
-    const hy = toCanvasY(harvesterPos[1]);
-    const headingRad = ((telemetry?.heading_deg || 0) * Math.PI) / 180.0;
+    // 5. Draw Harvested Golden Swath Trails
+    if (showCutTrail && waypoints.length > 1 && currentWpIdx > 0) {
+      ctx.strokeStyle = "#fbbf24";
+      ctx.lineWidth = 4.0;
+      ctx.beginPath();
+      for (let i = 0; i <= Math.min(currentWpIdx, waypoints.length - 1); i++) {
+        const wx = toCanvasX(waypoints[i].lon);
+        const wy = toCanvasY(waypoints[i].lat);
+        if (i === 0) ctx.moveTo(wx, wy);
+        else ctx.lineTo(wx, wy);
+      }
+      ctx.stroke();
+    }
 
-    // 1. Primary Harvester Machine
-    ctx.save();
-    ctx.translate(hx, hy);
-    ctx.rotate(headingRad);
+    // 6. Draw Obstacles (if detected)
+    if (activeObstacle) {
+      const ox = toCanvasX(activeObstacle.lon);
+      const oy = toCanvasY(activeObstacle.lat);
+      const obsRadiusPx = Math.max(16, (availW / (maxLon - minLon)) * 0.00015 * zoom);
 
-    // Chassis
-    ctx.fillStyle = "#10b981";
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(-10, -18, 20, 36, 4);
-    ctx.fill();
-    ctx.stroke();
+      ctx.fillStyle = "rgba(239, 68, 68, 0.3)";
+      ctx.beginPath();
+      ctx.arc(ox, oy, obsRadiusPx, 0, Math.PI * 2);
+      ctx.fill();
 
-    // 30ft Cutter Header
-    ctx.fillStyle = "#f59e0b";
-    ctx.fillRect(-22, -22, 44, 5);
+      ctx.strokeStyle = "#ef4444";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(ox, oy, obsRadiusPx, 0, Math.PI * 2);
+      ctx.stroke();
 
-    // Cab Glass
-    ctx.fillStyle = "#38bdf8";
-    ctx.fillRect(-7, -10, 14, 10);
-    ctx.restore();
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(ox, oy, 6, 0, Math.PI * 2);
+      ctx.fill();
 
-    // Combine Label
-    ctx.fillStyle = "#34d399";
-    ctx.font = "bold 10px JetBrains Mono, monospace";
-    ctx.fillText(`COMBINE_01 [${telemetry?.speed_kmh || 6.8} km/h]`, hx + 16, hy - 6);
+      ctx.fillStyle = "rgba(185, 28, 28, 0.9)";
+      ctx.fillRect(ox + obsRadiusPx + 4, oy - 12, 160, 22);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 10px JetBrains Mono, monospace";
+      ctx.fillText(`🛑 ${activeObstacle.type}`, ox + obsRadiusPx + 8, oy + 2);
+    }
 
-    // 2. Swarm Units
-    deployed.forEach((unit) => {
-      if (!unit.position || unit.id === "COMBINE_01") return;
-      const ux = toCanvasX(unit.position[0]);
-      const uy = toCanvasY(unit.position[1]);
+    // 7. Draw Live Autonomous Harvester & Swarm Grain Cart
+    if (telemetry?.position) {
+      const hx = toCanvasX(telemetry.position[0]);
+      const hy = toCanvasY(telemetry.position[1]);
+      const headingDeg = telemetry.heading_deg ?? 180.0;
+      const headingRad = (headingDeg * Math.PI) / 180.0;
+      const isEstop = telemetry.e_stop_active;
+      const isOrchard = telemetry?.is_orchard || fieldPreset?.crop_type?.includes("APPLE") || fieldPreset?.crop_type?.includes("GRAPE");
+      const tankLevel = telemetry?.grain_tank_pct ?? 0;
 
-      if (unit.type === "DRONE_SCOUT") {
-        // Drone Ground Recon Scan Beam
-        ctx.strokeStyle = "rgba(56, 189, 248, 0.4)";
-        ctx.lineWidth = 1.5;
-        ctx.fillStyle = "rgba(56, 189, 248, 0.08)";
-        ctx.beginPath();
-        ctx.arc(ux, uy, 28, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+      ctx.save();
+      ctx.translate(hx, hy);
+      ctx.rotate(headingRad);
 
-        // Quadcopter Cross
+      if (isOrchard) {
+        // Robotic Picking Rover
+        ctx.fillStyle = isEstop ? "#b91c1c" : "#0369a1";
         ctx.strokeStyle = "#38bdf8";
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.moveTo(ux - 8, uy - 8);
-        ctx.lineTo(ux + 8, uy + 8);
-        ctx.moveTo(ux + 8, uy - 8);
-        ctx.lineTo(ux - 8, uy + 8);
+        ctx.roundRect(-14, -18, 28, 36, 6);
+        ctx.fill();
         ctx.stroke();
 
-        // Drone Hub
-        ctx.fillStyle = "#ffffff";
+        // 4x Delta Robotic Arms
+        ctx.strokeStyle = isEstop ? "#ef4444" : "#38bdf8";
+        ctx.lineWidth = 2.5;
         ctx.beginPath();
-        ctx.arc(ux, uy, 3.5, 0, Math.PI * 2);
+        ctx.moveTo(-14, -6);
+        ctx.lineTo(-26, -10);
+        ctx.moveTo(-14, 8);
+        ctx.lineTo(-26, 12);
+        ctx.moveTo(14, -6);
+        ctx.lineTo(26, -10);
+        ctx.moveTo(14, 8);
+        ctx.lineTo(26, 12);
+        ctx.stroke();
+      } else {
+        // Broadacre Combine Harvester
+        ctx.fillStyle = isEstop ? "#ef4444" : "#fbbf24";
+        ctx.fillRect(-22, 14, 44, 7);
+
+        ctx.fillStyle = isEstop ? "#b91c1c" : "#22c55e";
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(-12, -22, 24, 38, 4);
         ctx.fill();
+        ctx.stroke();
 
         ctx.fillStyle = "#38bdf8";
-        ctx.font = "bold 9px JetBrains Mono, monospace";
-        ctx.fillText(`🛸 ${unit.status || "RECON"}`, ux + 12, uy - 4);
+        ctx.fillRect(-8, 2, 16, 8);
 
-      } else if (unit.type === "GRAIN_CART") {
-        // Grain Cart Vehicle
+        ctx.fillStyle = "#f59e0b";
+        ctx.fillRect(-9, -18, 18, 14);
+      }
+
+      ctx.restore();
+
+      // Harvester Label Tag
+      ctx.fillStyle = isEstop ? "#fca5a5" : (isOrchard ? "#38bdf8" : "#a7f3d0");
+      ctx.font = "bold 11px JetBrains Mono, monospace";
+      ctx.fillText(
+        `${telemetry.harvester_id} [${telemetry.speed_kmh} km/h]`,
+        hx + 18,
+        hy - 14
+      );
+
+      // SWARM GRAIN CART (Chaser Tractor) Unload On-The-Go Rendezvous (if hopper > 60%)
+      if (!isOrchard && tankLevel > 60) {
+        const cartX = hx - 36;
+        const cartY = hy + 8;
+
+        // Grain cart chassis
         ctx.fillStyle = "#0284c7";
         ctx.strokeStyle = "#38bdf8";
         ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.roundRect(ux - 9, uy - 12, 18, 24, 3);
+        ctx.roundRect(cartX - 10, cartY - 14, 20, 28, 3);
         ctx.fill();
         ctx.stroke();
 
-        if (unit.status === "UNLOAD_ON_THE_GO") {
-          // Auger grain flow beam
-          ctx.strokeStyle = "#fbbf24";
-          ctx.lineWidth = 2.5;
-          ctx.setLineDash([4, 4]);
-          ctx.beginPath();
-          ctx.moveTo(hx, hy);
-          ctx.lineTo(ux, uy);
-          ctx.stroke();
-          ctx.setLineDash([]);
-        }
-
-        ctx.fillStyle = "#38bdf8";
-        ctx.font = "bold 9px JetBrains Mono, monospace";
-        ctx.fillText(`🚛 ${unit.label || "Chaser Cart"}`, ux + 12, uy - 4);
-
-      } else if (unit.type === "HUMAN_CREW") {
-        // 15m Safety Halo
-        ctx.strokeStyle = "rgba(245, 158, 11, 0.6)";
-        ctx.lineWidth = 1.5;
+        // Auger Transfer Stream Beam
+        ctx.strokeStyle = "#fbbf24";
+        ctx.lineWidth = 3;
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
-        ctx.arc(ux, uy, 22, 0, Math.PI * 2);
+        ctx.moveTo(hx, hy);
+        ctx.lineTo(cartX, cartY);
         ctx.stroke();
         ctx.setLineDash([]);
 
-        ctx.fillStyle = "#f59e0b";
+        ctx.fillStyle = "#38bdf8";
+        ctx.font = "bold 10px JetBrains Mono, monospace";
+        ctx.fillText("GRAIN_CART_01 [UNLOADING]", cartX - 40, cartY - 18);
+      }
+    }
+
+    // 8. Draw All Additional Deployed Fleet Units (Recon Drones, Human Field Crews, Robotic Rovers)
+    const extraUnits = telemetry?.deployed_units || [];
+    extraUnits.forEach((unit) => {
+      if (!unit.position || unit.unit_type === "COMBINE_HARVESTER") return;
+      const ux = toCanvasX(unit.position[0]);
+      const uy = toCanvasY(unit.position[1]);
+
+      ctx.save();
+      ctx.translate(ux, uy);
+
+      if (unit.unit_type === "RECON_DRONE") {
+        // Quadcopter Drone Icon with scan beam
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.arc(ux, uy, 5, 0, Math.PI * 2);
+        ctx.arc(0, 0, 14, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = "rgba(56, 189, 248, 0.25)";
+        ctx.beginPath();
+        ctx.arc(0, 0, 24, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = "#fbbf24";
-        ctx.font = "bold 9px JetBrains Mono, monospace";
-        ctx.fillText(`👷‍♂️ ${unit.label || "Crew"} [15m GEOFENCE]`, ux + 12, uy - 4);
+        ctx.fillStyle = "#38bdf8";
+        ctx.fillRect(-5, -5, 10, 10);
+
+      } else if (unit.unit_type === "HUMAN_FIELD_CREW") {
+        // Human Field Crew Badge with pulse ring
+        ctx.fillStyle = "rgba(52, 211, 153, 0.3)";
+        ctx.beginPath();
+        ctx.arc(0, 0, 16, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#34d399";
+        ctx.beginPath();
+        ctx.arc(0, -4, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillRect(-6, 2, 12, 8);
+
+      } else if (unit.unit_type === "ROBOTIC_PICKER") {
+        // Robotic Delta Arm Rover
+        ctx.fillStyle = "#c084fc";
+        ctx.fillRect(-8, -12, 16, 24);
+        ctx.strokeStyle = "#e879f9";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-12, -8, 24, 16);
+
+      } else if (unit.unit_type === "GRAIN_CHASER_CART") {
+        // Autonomous Grain Cart
+        ctx.fillStyle = "#0284c7";
+        ctx.fillRect(-9, -13, 18, 26);
       }
+
+      ctx.restore();
+
+      // Floating Unit Label Tag
+      ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
+      ctx.fillRect(ux + 14, uy - 12, 175, 20);
+      ctx.strokeStyle = unit.color || "#38bdf8";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(ux + 14, uy - 12, 175, 20);
+
+      ctx.fillStyle = unit.color || "#38bdf8";
+      ctx.font = "bold 9.5px JetBrains Mono, monospace";
+      ctx.fillText(`${unit.unit_name}`, ux + 18, uy + 2);
     });
 
-  }, [fieldPreset, missionPlan, telemetry, activeObstacle, activeScenario, showNDVI, showTrajectories, showHeadlands, showCutTrail, zoom, viewMode, zones, isDrawingZone, drawingPoints]);
+  }, [fieldPreset, missionPlan, telemetry, activeObstacle, activeScenario, showNDVI, showTrajectories, showHeadlands, showCutTrail, zoom, viewMode]);
 
-  // Handle Canvas Click to add boundary point
-  const handleCanvasClick = (e) => {
-    if (!isDrawingZone) return;
+  // Handle canvas click to place deployed units or mapped zones
+  const handleCanvasClick = async (e) => {
+    if (!deployMode && !zoneMode) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const rect = canvas.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
@@ -545,93 +577,304 @@ export function FieldMap2D({
     const minLat = Math.min(...lats);
     const maxLat = Math.max(...lats);
 
-    const pad = 40;
-    const availW = Math.max(100, rect.width - pad * 2);
-    const availH = Math.max(100, rect.height - pad * 2);
+    const pad = 48;
+    const width = rect.width;
+    const height = rect.height;
+    const availW = width - pad * 2;
+    const availH = height - pad * 2;
+    const centerX = width / 2;
+    const centerY = height / 2;
 
-    const fieldSpanX_m = (maxLon - minLon) * 84000.0;
-    const fieldSpanY_m = (maxLat - minLat) * 111000.0;
-    const fieldAspect = fieldSpanX_m / (fieldSpanY_m || 1);
-    const canvasAspect = availW / availH;
+    const normX = (clickX - (centerX - (availW * zoom) / 2)) / (availW * zoom);
+    const normY = (clickY - (centerY - (availH * zoom) / 2)) / (availH * zoom);
 
-    let fitW, fitH;
-    if (canvasAspect > fieldAspect) {
-      fitH = availH;
-      fitW = availH * fieldAspect;
-    } else {
-      fitW = availW;
-      fitH = availW / (fieldAspect || 1);
-    }
+    const targetLon = minLon + normX * (maxLon - minLon);
+    const targetLat = maxLat - normY * (maxLat - minLat);
 
-    const mapOriginX = (rect.width - fitW) / 2;
-    const mapOriginY = (rect.height - fitH) / 2;
-
-    const clickLon = minLon + ((clickX - mapOriginX) / fitW) * (maxLon - minLon);
-    const clickLat = minLat + (1 - (clickY - mapOriginY) / fitH) * (maxLat - minLat);
-
-    if (onAddDrawingPoint) {
-      onAddDrawingPoint([roundGeo(clickLon), roundGeo(clickLat)]);
+    if (deployMode) {
+      const names = {
+        RECON_DRONE: "Recon Drone Alpha",
+        HUMAN_FIELD_CREW: "Human Select Pick Team",
+        ROBOTIC_PICKER: "Delta Orchard Rover",
+        COMBINE_HARVESTER: "Combine Harvester Unit",
+        GRAIN_CHASER_CART: "Autonomous Grain Cart",
+      };
+      try {
+        await deployUnit(deployMode, names[deployMode] || "Deployed Unit", [targetLon, targetLat]);
+      } catch (err) {
+        console.error("Deploy unit error:", err);
+      }
+      setDeployMode(null);
+    } else if (zoneMode) {
+      const deltaLon = (maxLon - minLon) * 0.12;
+      const deltaLat = (maxLat - minLat) * 0.12;
+      const zonePolygon = [
+        [targetLon - deltaLon, targetLat + deltaLat],
+        [targetLon + deltaLon, targetLat + deltaLat],
+        [targetLon + deltaLon, targetLat - deltaLat],
+        [targetLon - deltaLon, targetLat - deltaLat],
+      ];
+      const zoneColors = {
+        PRIORITY_HARVEST: "#10b981",
+        QUARANTINE_BLIGHT: "#ef4444",
+        STAGING_HEADLAND: "#fbbf24",
+      };
+      const zoneNames = {
+        PRIORITY_HARVEST: "High-Brix Sector",
+        QUARANTINE_BLIGHT: "Blight Isolation Zone",
+        STAGING_HEADLAND: "Headland Staging Area",
+      };
+      try {
+        await createHarvestZone(
+          zoneNames[zoneMode] || "Mapped Sector",
+          zoneMode,
+          zoneColors[zoneMode] || "#10b981",
+          zonePolygon
+        );
+      } catch (err) {
+        console.error("Create zone error:", err);
+      }
+      setZoneMode(null);
     }
   };
 
-  const roundGeo = (val) => Math.round(val * 1000000) / 1000000;
-
   return (
-    <div className="map-panel" style={{ height: "100%", width: "100%", position: "relative" }}>
+    <div className="map-panel" style={{ height: "100%", flex: 1 }}>
       
-      {/* Top Map Header Controls */}
+      {/* Top Map Toolbar */}
       <div className="map-header-bar">
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--text-main)", display: "flex", alignItems: "center", gap: "6px" }}>
-            <Compass size={14} color="var(--color-brand)" />
-            {fieldPreset?.name || "Autonomous Field Parcel"}
+          <Crosshair size={15} color="var(--color-brand)" />
+          <span style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-main)" }}>
+            {viewMode === "3D_CAB_POV" ? "3D First-Person Tractor Cab Camera" : "Digital Twin Field Radar"}
           </span>
-          <span className="badge-pill">
-            {fieldPreset?.crop_display_name || "Wheat"}
+          <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+            ({fieldPreset?.area_hectares} ha • {fieldPreset?.name})
           </span>
         </div>
 
-        {/* Layer View Toggles */}
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+        {/* View Mode & Layer Toggles */}
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", position: "relative" }}>
+          
+          {/* Unit Deployment Dropdown Button */}
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={() => {
+                setShowDeployMenu(!showDeployMenu);
+                setShowZoneMenu(false);
+              }}
+              className="speed-pill active"
+              style={{ display: "flex", alignItems: "center", gap: "4px", background: "rgba(56, 189, 248, 0.18)", color: "#38bdf8", border: "1px solid rgba(56, 189, 248, 0.4)" }}
+            >
+              <Plus size={12} /> {deployMode ? `Click Map to Place ${deployMode}` : "Deploy Unit"}
+            </button>
+
+            {showDeployMenu && (
+              <div 
+                style={{
+                  position: "absolute",
+                  top: "100%",
+                  right: 0,
+                  marginTop: "6px",
+                  background: "rgba(10, 16, 26, 0.95)",
+                  border: "1px solid var(--border-color)",
+                  borderRadius: "8px",
+                  padding: "6px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "4px",
+                  zIndex: 100,
+                  width: "200px"
+                }}
+              >
+                {[
+                  { type: "RECON_DRONE", label: "🚁 Recon Drone", color: "#38bdf8" },
+                  { type: "HUMAN_FIELD_CREW", label: "👨‍🌾 Human Pick Crew", color: "#34d399" },
+                  { type: "ROBOTIC_PICKER", label: "🤖 Delta Orchard Rover", color: "#c084fc" },
+                  { type: "COMBINE_HARVESTER", label: "🚜 Heavy Combine", color: "#fbbf24" },
+                  { type: "GRAIN_CHASER_CART", label: "🚛 Grain Chaser Cart", color: "#a7f3d0" },
+                ].map((u) => (
+                  <button
+                    key={u.type}
+                    onClick={() => {
+                      setDeployMode(u.type);
+                      setShowDeployMenu(false);
+                    }}
+                    style={{
+                      background: "rgba(17, 24, 39, 0.8)",
+                      color: u.color,
+                      border: "1px solid rgba(255,255,255,0.06)",
+                      padding: "6px 8px",
+                      borderRadius: "5px",
+                      fontSize: "0.72rem",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      textAlign: "left"
+                    }}
+                  >
+                    {u.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Zone Mapping Dropdown Button */}
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={() => {
+                setShowZoneMenu(!showZoneMenu);
+                setShowDeployMenu(false);
+              }}
+              className="speed-pill active"
+              style={{ display: "flex", alignItems: "center", gap: "4px", background: "rgba(16, 185, 129, 0.18)", color: "#34d399", border: "1px solid rgba(16, 185, 129, 0.4)" }}
+            >
+              <MapPin size={12} /> {zoneMode ? `Click Map to Place ${zoneMode}` : "Map Zone"}
+            </button>
+
+            {showZoneMenu && (
+              <div 
+                style={{
+                  position: "absolute",
+                  top: "100%",
+                  right: 0,
+                  marginTop: "6px",
+                  background: "rgba(10, 16, 26, 0.95)",
+                  border: "1px solid var(--border-color)",
+                  borderRadius: "8px",
+                  padding: "6px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "4px",
+                  zIndex: 100,
+                  width: "210px"
+                }}
+              >
+                {[
+                  { type: "PRIORITY_HARVEST", label: "🟩 High-Brix Priority Sector", color: "#10b981" },
+                  { type: "QUARANTINE_BLIGHT", label: "🟥 Fungal Blight Quarantine", color: "#ef4444" },
+                  { type: "STAGING_HEADLAND", label: "🟨 Headland Staging Area", color: "#fbbf24" },
+                ].map((z) => (
+                  <button
+                    key={z.type}
+                    onClick={() => {
+                      setZoneMode(z.type);
+                      setShowZoneMenu(false);
+                    }}
+                    style={{
+                      background: "rgba(17, 24, 39, 0.8)",
+                      color: z.color,
+                      border: "1px solid rgba(255,255,255,0.06)",
+                      padding: "6px 8px",
+                      borderRadius: "5px",
+                      fontSize: "0.72rem",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      textAlign: "left"
+                    }}
+                  >
+                    {z.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 2D vs 3D Cab POV Switcher */}
           <button
             onClick={() => setViewMode(viewMode === "2D_RADAR" ? "3D_CAB_POV" : "2D_RADAR")}
-            className="btn-dock btn-dock-secondary"
-            style={{ padding: "4px 10px", fontSize: "0.72rem" }}
+            className="speed-pill active"
+            style={{ display: "flex", alignItems: "center", gap: "4px", background: "rgba(255, 255, 255, 0.08)", color: "var(--text-main)", border: "1px solid var(--border-color)" }}
           >
-            <Camera size={12} />
-            <span>{viewMode === "2D_RADAR" ? "3D Cab POV" : "2D Radar"}</span>
+            <Camera size={12} /> {viewMode === "2D_RADAR" ? "3D POV" : "2D Radar"}
           </button>
 
-          <button
-            onClick={() => setShowNDVI(!showNDVI)}
-            className={`speed-pill ${showNDVI ? "active" : ""}`}
-          >
-            NDVI Heatmap
-          </button>
+          {viewMode === "2D_RADAR" && (
+            <>
+              <button
+                onClick={() => setShowNDVI(!showNDVI)}
+                className={`speed-pill ${showNDVI ? "active" : ""}`}
+              >
+                NDVI
+              </button>
+              <button
+                onClick={() => setShowTrajectories(!showTrajectories)}
+                className={`speed-pill ${showTrajectories ? "active" : ""}`}
+              >
+                Swaths
+              </button>
+              
+              {/* Zoom Buttons */}
+              <button
+                onClick={() => setZoom((z) => Math.min(2.5, z + 0.2))}
+                className="speed-pill"
+                title="Zoom In"
+              >
+                <ZoomIn size={12} />
+              </button>
+              <button
+                onClick={() => setZoom((z) => Math.max(0.6, z - 0.2))}
+                className="speed-pill"
+                title="Zoom Out"
+              >
+                <ZoomOut size={12} />
+              </button>
+              <button
+                onClick={() => setZoom(1.0)}
+                className="speed-pill"
+                title="Reset Zoom"
+              >
+                <RefreshCw size={12} />
+              </button>
+            </>
+          )}
 
-          <button
-            onClick={() => setShowTrajectories(!showTrajectories)}
-            className={`speed-pill ${showTrajectories ? "active" : ""}`}
-          >
-            Swaths
-          </button>
         </div>
       </div>
 
-      {/* Main Canvas Viewport */}
-      <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
+      {/* Placement Prompt Banner if in active deployment mode */}
+      {(deployMode || zoneMode) && (
+        <div 
+          style={{
+            position: "absolute",
+            top: "50px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "rgba(14, 116, 144, 0.95)",
+            color: "#ffffff",
+            padding: "6px 16px",
+            borderRadius: "20px",
+            fontSize: "0.75rem",
+            fontWeight: 700,
+            zIndex: 10,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+            border: "1px solid #38bdf8",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}
+        >
+          <Sparkles size={14} />
+          <span>Click anywhere on the map to place {deployMode ? `Unit: ${deployMode}` : `Harvest Zone: ${zoneMode}`}</span>
+          <button 
+            onClick={() => { setDeployMode(null); setZoneMode(null); }}
+            style={{ background: "none", border: "none", color: "#ffffff", cursor: "pointer", fontWeight: 800, padding: "0 4px" }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Interactive Canvas Container */}
+      <div style={{ flex: 1, position: "relative", minHeight: "360px", background: "#060911" }}>
         <canvas
           ref={canvasRef}
           onClick={handleCanvasClick}
-          style={{
-            width: "100%",
-            height: "100%",
-            display: "block",
-            cursor: isDrawingZone ? "crosshair" : "default",
-          }}
+          style={{ width: "100%", height: "100%", display: "block", cursor: (deployMode || zoneMode) ? "crosshair" : "default" }}
         />
       </div>
 
     </div>
   );
 }
+

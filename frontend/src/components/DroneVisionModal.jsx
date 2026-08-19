@@ -22,7 +22,7 @@ import {
 import { fetchVideoSamples, analyzeImage, analyzeVideo } from "../services/api";
 
 
-export function DroneVisionModal({ isOpen, onClose, currentCropType, onOpenCopilotWithContext, isTabMode = false }) {
+export function DroneVisionModal({ isOpen, onClose, currentCropType, onOpenCopilotWithContext }) {
   const [activeTab, setActiveTab] = useState("IMAGE_LAB"); // 'IMAGE_LAB' | 'VIDEO_STREAM'
   const [samples, setSamples] = useState([]);
   const [selectedPresetId, setSelectedPresetId] = useState("HONEYCRISP_ORCHARD");
@@ -40,7 +40,7 @@ export function DroneVisionModal({ isOpen, onClose, currentCropType, onOpenCopil
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  // Load sample presets list on open or mount
+  // Load sample presets list on open
   useEffect(() => {
     async function initSamples() {
       try {
@@ -54,11 +54,10 @@ export function DroneVisionModal({ isOpen, onClose, currentCropType, onOpenCopil
         console.error("Failed to load crop presets:", err);
       }
     }
-    if (isOpen || isTabMode) {
+    if (isOpen) {
       initSamples();
     }
-  }, [isOpen, isTabMode]);
-
+  }, [isOpen]);
 
   // Run Image Diagnostic
   const runImageScan = async (presetId, cropType, customDataUrl = null) => {
@@ -371,56 +370,65 @@ export function DroneVisionModal({ isOpen, onClose, currentCropType, onOpenCopil
     : (videoAnalysis?.frames?.[currentFrameIdx]?.detections || []);
   const selectedFruit = currentDetections?.find((d) => d.id === selectedFruitId) || currentDetections?.[0];
 
-  if (!isOpen && !isTabMode) return null;
+  if (!isOpen) return null;
 
-  const modalContent = (
+  return (
     <div 
-      className="glass-panel" 
-      style={{ 
-        width: "100%", 
-        height: isTabMode ? "100%" : "auto",
-        maxWidth: isTabMode ? "100%" : "1160px", 
-        maxHeight: isTabMode ? "100%" : "92vh", 
-        display: "flex", 
-        flexDirection: "column", 
-        overflow: "hidden",
-        border: "1px solid rgba(6, 182, 212, 0.35)",
-        borderRadius: "var(--radius-lg)",
-        boxShadow: isTabMode ? "none" : "0 0 45px rgba(6, 182, 212, 0.2)",
-        flex: 1,
+      style={{
+        position: "fixed",
+        inset: 0,
+        backgroundColor: "rgba(3, 7, 18, 0.88)",
+        backdropFilter: "blur(14px)",
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "20px"
       }}
     >
-      
-      {/* Modal Top Header */}
       <div 
+        className="glass-panel" 
         style={{ 
-          padding: "12px 20px", 
-          borderBottom: "1px solid var(--border-color)", 
+          width: "100%", 
+          maxWidth: "1160px", 
+          maxHeight: "92vh", 
           display: "flex", 
-          alignItems: "center", 
-          justifyContent: "space-between",
-          background: "rgba(10, 16, 26, 0.95)"
+          flexDirection: "column", 
+          overflow: "hidden",
+          border: "1px solid rgba(6, 182, 212, 0.35)",
+          boxShadow: "0 0 45px rgba(6, 182, 212, 0.2)"
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div style={{ padding: "7px", borderRadius: "8px", background: "rgba(6, 182, 212, 0.15)", border: "1px solid rgba(6, 182, 212, 0.3)" }}>
-            <Scan size={20} color="var(--color-cyan)" />
-          </div>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <h2 style={{ fontSize: "1.05rem", margin: 0, fontWeight: 800, letterSpacing: "-0.01em" }}>
-                CROPVISION™ AI DIAGNOSTIC & RIPENESS LAB
-              </h2>
-              <span className="badge" style={{ background: "rgba(16, 185, 129, 0.15)", color: "#34d399", fontSize: "0.68rem" }}>
-                AWS Bedrock Vision Core
-              </span>
+        
+        {/* Modal Top Header */}
+        <div 
+          style={{ 
+            padding: "12px 20px", 
+            borderBottom: "1px solid var(--border-color)", 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "space-between",
+            background: "rgba(10, 16, 26, 0.95)"
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{ padding: "7px", borderRadius: "8px", background: "rgba(6, 182, 212, 0.15)", border: "1px solid rgba(6, 182, 212, 0.3)" }}>
+              <Scan size={20} color="var(--color-cyan)" />
             </div>
-            <p style={{ fontSize: "0.72rem", color: "var(--text-secondary)", margin: 0 }}>
-              Multimodal Crop Ripeness • Optical Sugar Brix (°Bx) Spectrometry • Pathogen Blight Early Detection
-            </p>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <h2 style={{ fontSize: "1.05rem", margin: 0, fontWeight: 800, letterSpacing: "-0.01em" }}>
+                  CROPVISION™ AI DIAGNOSTIC & RIPENESS LAB
+                </h2>
+                <span className="badge" style={{ background: "rgba(16, 185, 129, 0.15)", color: "#34d399", fontSize: "0.68rem" }}>
+                  AWS Bedrock Vision Core
+                </span>
+              </div>
+              <p style={{ fontSize: "0.72rem", color: "var(--text-secondary)", margin: 0 }}>
+                Multimodal Crop Ripeness • Optical Sugar Brix (°Bx) Spectrometry • Pathogen Blight Early Detection
+              </p>
+            </div>
           </div>
-        </div>
-
 
           {/* Mode Switch Tabs & Close */}
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -473,24 +481,21 @@ export function DroneVisionModal({ isOpen, onClose, currentCropType, onOpenCopil
               </button>
             </div>
 
-            {!isTabMode && (
-              <button 
-                onClick={onClose}
-                style={{ 
-                  background: "rgba(255,255,255,0.08)", 
-                  border: "none", 
-                  color: "#9ca3af", 
-                  cursor: "pointer", 
-                  borderRadius: "8px", 
-                  padding: "6px" 
-                }}
-              >
-                <X size={18} />
-              </button>
-            )}
+            <button 
+              onClick={onClose}
+              style={{ 
+                background: "rgba(255,255,255,0.08)", 
+                border: "none", 
+                color: "#9ca3af", 
+                cursor: "pointer", 
+                borderRadius: "8px", 
+                padding: "6px" 
+              }}
+            >
+              <X size={18} />
+            </button>
           </div>
         </div>
-
 
         {/* Main Body Grid */}
         <div style={{ padding: "14px 18px", display: "grid", gridTemplateColumns: "1fr 340px", gap: "16px", flex: 1, minHeight: 0, overflow: "hidden" }}>
@@ -864,32 +869,12 @@ export function DroneVisionModal({ isOpen, onClose, currentCropType, onOpenCopil
               <MessageSquare size={13} />
               Discuss Scan with AgriCopilot
             </button>
+
           </div>
+
         </div>
+
       </div>
-  );
-
-
-  if (isTabMode) {
-    return <div style={{ height: "100%", width: "100%", display: "flex", flexDirection: "column", padding: "16px", minHeight: 0 }}>{modalContent}</div>;
-  }
-
-  return (
-    <div 
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(3, 7, 18, 0.88)",
-        backdropFilter: "blur(14px)",
-        zIndex: 9999,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "20px"
-      }}
-    >
-      {modalContent}
     </div>
   );
 }
-

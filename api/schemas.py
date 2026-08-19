@@ -123,18 +123,35 @@ class CopilotChatRequest(BaseModel):
 
 
 class DeployUnitRequest(BaseModel):
-    unit_type: str = Field(..., example="DRONE_SCOUT", description="COMBINE, TRACTOR, GRAIN_CART, DRONE_SCOUT, HUMAN_CREW")
-    label: str = Field(..., example="Scout UAV Alpha")
-    position: Optional[List[float]] = None
-    assigned_task: Optional[str] = "AUTONOMOUS_OPERATION"
+    unit_type: str = Field(..., example="RECON_DRONE", description="COMBINE_HARVESTER, RECON_DRONE, ROBOTIC_PICKER, GRAIN_CHASER_CART, HUMAN_FIELD_CREW")
+    unit_name: str = Field(..., example="Recon Drone Alpha")
+    initial_position: List[float] = Field(..., example=[-96.808, 41.252])
+    assigned_zone_id: Optional[str] = None
 
 
-class MapHarvestZoneRequest(BaseModel):
-    polygon_coords: List[List[float]] = Field(..., description="List of [lon, lat] points outlining custom zone")
-    crop_type: Optional[str] = "WHEAT_HARD_RED"
-    field_name: Optional[str] = "Custom Drawn Harvest Parcel"
-    soil_moisture_pct: Optional[float] = 18.4
-    soil_temp_c: Optional[float] = 22.1
+class HarvestZoneSpec(BaseModel):
+    id: str
+    name: str
+    zone_type: str  # PRIORITY_HARVEST, QUARANTINE_BLIGHT, STAGING_HEADLAND, HUMAN_MANUAL_PICK
+    color_hex: str
+    coordinates_polygon: List[List[float]]
+    area_hectares: float
+    status: str
+
+
+class CreateHarvestZoneRequest(BaseModel):
+    name: str = Field(..., example="High-Brix Sector Alpha")
+    zone_type: str = Field("PRIORITY_HARVEST", example="PRIORITY_HARVEST")
+    color_hex: Optional[str] = "#10b981"
+    coordinates_polygon: List[List[float]] = Field(
+        ...,
+        example=[
+            [-96.810, 41.254],
+            [-96.804, 41.254],
+            [-96.804, 41.250],
+            [-96.810, 41.250],
+        ]
+    )
 
 
 

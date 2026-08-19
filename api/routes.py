@@ -14,12 +14,12 @@ from api.schemas import (
     ImageAnalysisRequest,
     CopilotChatRequest,
     DeployUnitRequest,
-    MapHarvestZoneRequest,
+    CreateHarvestZoneRequest,
 )
+
 from api.websocket_manager import ws_manager
 from engine.orchestrator import AutoHarvestOrchestrator
 from engine.copilot import AgriCopilotAgent
-
 
 router = APIRouter(prefix="/api/v1", tags=["AutoHarvest Core"])
 orchestrator = AutoHarvestOrchestrator()
@@ -383,133 +383,82 @@ def get_bedrock_status():
     }
 
 
-@router.post("/deploy-unit")
+# ==========================================
+# MULTI-UNIT DEPLOYMENT & HARVEST ZONE APIS
+# ==========================================
+
+@router.get("/units")
+def list_deployed_units():
+    """Returns all currently deployed units across the field."""
+    return {"units": ws_manager.deployed_units}
+
+
+@router.post("/units")
 async def deploy_unit(req: DeployUnitRequest):
-    """
-    Deploys a new autonomous machine, chaser grain cart, scouting drone, or human crew.
-    """
-    unit = ws_manager.deploy_unit(
+    """Deploys a new unit (Combine, Recon Drone, Robotic Rover, Grain Cart, Human Crew) to the field."""
+    new_unit = ws_manager.deploy_unit(
         unit_type=req.unit_type,
-        label=req.label,
-        position=req.position,
-        task=req.assigned_task or "AUTONOMOUS_OPERATION"
+        unit_name=req.unit_name,
+        position=req.initial_position,
+        assigned_zone_id=req.assigned_zone_id,
     )
     await ws_manager.broadcast_json({
-        "type": "FLEET_UNIT_DEPLOYED",
-        "unit": unit,
+        "type": "UNIT_DEPLOYED",
+        "unit": new_unit,
         "deployed_units": ws_manager.deployed_units,
     })
-    return {"status": "UNIT_DEPLOYED", "unit": unit, "total_units": len(ws_manager.deployed_units)}
+    return {"status": "UNIT_DEPLOYED", "unit": new_unit}
 
 
-@router.post("/remove-unit")
-async def remove_unit(payload: Dict[str, str]):
-    """
-    Removes a deployed unit from the active swarm.
-    """
-    unit_id = payload.get("unit_id")
-    if not unit_id:
-        raise HTTPException(status_code=400, detail="unit_id required")
+@router.delete("/units/{unit_id}")
+async def remove_unit(unit_id: str):
+    """Removes a deployed unit from the field."""
     removed = ws_manager.remove_unit(unit_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Unit not found")
     await ws_manager.broadcast_json({
-        "type": "FLEET_UNIT_REMOVED",
+        "type": "UNIT_REMOVED",
         "unit_id": unit_id,
         "deployed_units": ws_manager.deployed_units,
     })
-    return {"status": "UNIT_REMOVED" if removed else "NOT_FOUND", "unit_id": unit_id, "total_units": len(ws_manager.deployed_units)}
+    return {"status": "UNIT_REMOVED", "unit_id": unit_id}
 
 
-@router.post("/map-harvest-zone")
-async def map_harvest_zone(req: MapHarvestZoneRequest):
-    """
-    Ingests custom drawn polygon coordinates, recalculates Boustrophedon swaths,
-    predicts yield, and generates dynamic Dubins path trajectories.
-    """
-    lons = [p[0] for p in req.polygon_coords]
-    lats = [p[1] for p in req.polygon_coords]
-    d_lon_m = (max(lons) - min(lons)) * 84000.0
-    d_lat_m = (max(lats) - min(lats)) * 111000.0
-    area_ha = round(max(2.0, (d_lon_m * d_lat_m) / 10000.0), 1)
-
-    plan = orchestrator.process_field_mission(
-        field_id="CUSTOM_DRAWN_ZONE",
-        crop_type=req.crop_type or "WHEAT_HARD_RED",
-        coordinates_polygon=req.polygon_coords,
-        soil_moisture_pct=req.soil_moisture_pct or 18.4,
-        soil_temp_c=req.soil_temp_c or 22.1,
-    )
-    ws_manager.load_mission_plan(plan)
-    ws_manager.reset_simulation()
-    
-    await ws_manager.broadcast_json({
-        "type": "CUSTOM_ZONE_MAPPED",
-        "field_id": "CUSTOM_DRAWN_ZONE",
-        "area_hectares": area_ha,
-        "plan": plan,
-    })
 @router.get("/zones")
-def get_zones():
-    """Returns list of all active field partition zones."""
-    return ws_manager.zones
+def list_harvest_zones():
+    """Returns all active custom harvest zones mapped on the field."""
+    return {"zones": ws_manager.harvest_zones}
 
 
 @router.post("/zones")
-async def create_zone(payload: Dict[str, Any]):
-    """Creates a new named zone and broadcasts update."""
-    name = payload.get("name", "Custom Harvest Sector")
-    polygon = payload.get("polygon", [])
-    crop_type = payload.get("crop_type", "WHEAT_HARD_RED")
-    if len(polygon) < 3:
-        raise HTTPException(status_code=400, detail="Polygon must have at least 3 points")
-    
-    zone = ws_manager.add_zone(name=name, polygon=polygon, crop_type=crop_type)
+async def create_harvest_zone(req: CreateHarvestZoneRequest):
+    """Maps out a new custom harvest zone on the digital twin radar."""
+    new_zone = ws_manager.add_harvest_zone(
+        name=req.name,
+        zone_type=req.zone_type,
+        color_hex=req.color_hex or "#10b981",
+        polygon=req.coordinates_polygon,
+    )
     await ws_manager.broadcast_json({
-        "type": "ZONES_UPDATED",
-        "zones": ws_manager.zones,
+        "type": "ZONE_MAPPED",
+        "zone": new_zone,
+        "harvest_zones": ws_manager.harvest_zones,
     })
-    return {"status": "ZONE_CREATED", "zone": zone, "zones": ws_manager.zones}
+    return {"status": "ZONE_MAPPED", "zone": new_zone}
 
 
 @router.delete("/zones/{zone_id}")
-async def delete_zone(zone_id: str):
-    """Deletes a zone by ID."""
-    removed = ws_manager.delete_zone(zone_id)
-    await ws_manager.broadcast_json({
-        "type": "ZONES_UPDATED",
-        "zones": ws_manager.zones,
-    })
-    return {"status": "ZONE_DELETED" if removed else "NOT_FOUND", "zones": ws_manager.zones}
-
-
-@router.post("/zones/{zone_id}/activate")
-async def activate_zone(zone_id: str):
-    """Generates Boustrophedon swaths and dispatches fleet to selected zone."""
-    zone = next((z for z in ws_manager.zones if z["id"] == zone_id), None)
-    if not zone:
+async def remove_harvest_zone(zone_id: str):
+    """Deletes a custom harvest zone."""
+    removed = ws_manager.remove_harvest_zone(zone_id)
+    if not removed:
         raise HTTPException(status_code=404, detail="Zone not found")
-
-    plan = orchestrator.process_field_mission(
-        field_id=zone["id"],
-        crop_type=zone["crop_type"],
-        coordinates_polygon=zone["polygon"],
-        soil_moisture_pct=18.4,
-        soil_temp_c=22.1,
-    )
-    ws_manager.load_mission_plan(plan)
-    ws_manager.reset_simulation()
-    
-    # Mark zone as active
-    for z in ws_manager.zones:
-        z["status"] = "IN_PROGRESS" if z["id"] == zone_id else "STANDBY"
-
     await ws_manager.broadcast_json({
-        "type": "ZONE_ACTIVATED",
+        "type": "ZONE_REMOVED",
         "zone_id": zone_id,
-        "plan": plan,
-        "zones": ws_manager.zones,
+        "harvest_zones": ws_manager.harvest_zones,
     })
-    return {"status": "ZONE_ACTIVATED", "zone": zone, "plan": plan}
-
+    return {"status": "ZONE_REMOVED", "zone_id": zone_id}
 
 
 
