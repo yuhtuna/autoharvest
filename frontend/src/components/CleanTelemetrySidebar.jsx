@@ -9,9 +9,14 @@ import {
   CloudRain, 
   Users, 
   AlertTriangle, 
-  RotateCcw 
+  RotateCcw,
+  Eye,
+  Compass,
+  Truck,
+  ShieldCheck
 } from "lucide-react";
 import { deleteUnit, deleteHarvestZone } from "../services/api";
+
 
 
 export function CleanTelemetrySidebar({
