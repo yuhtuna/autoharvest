@@ -4,11 +4,10 @@ import confetti from "canvas-confetti";
 import { Header } from "./components/Header";
 import { FieldMap2D } from "./components/FieldMap2D";
 import { FloatingControlDock } from "./components/FloatingControlDock";
-import { CleanTelemetrySidebar } from "./components/CleanTelemetrySidebar";
+import { TabPanel } from "./components/TabPanel";
 import { DroneVisionModal } from "./components/DroneVisionModal";
 import { AgriCopilotModal } from "./components/AgriCopilotModal";
 import { MissionReportModal } from "./components/MissionReportModal";
-import { DeploymentModal } from "./components/DeploymentModal";
 
 import { fetchFields, scanField, triggerScenario, sendFleetControl } from "./services/api";
 import { fleetWS } from "./services/websocket";
@@ -23,12 +22,13 @@ export default function App() {
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   
+  // Sidebar tab state: "overview" | "fleet" | "vision" | "scenarios"
+  const [activeTab, setActiveTab] = useState("overview");
+
   // Modals state
   const [isDroneModalOpen, setIsDroneModalOpen] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
-  const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
-
 
   const hasCelebratedRef = useRef(false);
 
@@ -167,15 +167,12 @@ export default function App() {
   return (
     <div className="app-container">
       
-      {/* 1. Minimal Top Navigation Bar with Copilot & Report buttons */}
+      {/* 1. Minimal Top Navigation Bar */}
       <Header
         fields={fields}
         currentFieldId={currentFieldId}
         onSelectField={handleSelectField}
         telemetry={telemetry}
-        onOpenDroneModal={() => setIsDroneModalOpen(true)}
-        onOpenCopilotModal={() => setIsCopilotOpen(true)}
-        onOpenReportModal={() => setIsReportOpen(true)}
       />
 
       {/* 2. Main 2-Column Dashboard Grid */}
@@ -189,7 +186,6 @@ export default function App() {
             telemetry={telemetry}
             activeObstacle={activeObstacle}
             activeScenario={activeScenario}
-            onOpenDeployModal={() => setIsDeployModalOpen(true)}
           />
 
           {/* Floating Modern Control Dock */}
@@ -201,13 +197,18 @@ export default function App() {
           />
         </div>
 
-        {/* Right: Clean Telemetry Sidebar (No flashing dials) */}
-        <CleanTelemetrySidebar
+        {/* Right: Tabbed Operations Panel */}
+        <TabPanel
           telemetry={telemetry}
           missionPlan={missionPlan}
           currentFieldPreset={currentFieldPreset}
           activeScenario={activeScenario}
           onTriggerScenario={handleTriggerScenario}
+          onOpenDroneModal={() => setIsDroneModalOpen(true)}
+          onOpenCopilotModal={() => setIsCopilotOpen(true)}
+          onOpenReportModal={() => setIsReportOpen(true)}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
         />
 
       </main>
@@ -242,14 +243,6 @@ export default function App() {
         currentFieldPreset={currentFieldPreset}
       />
 
-      {/* 6. Multi-Unit Equipment & Crew Deployment Modal */}
-      <DeploymentModal
-        isOpen={isDeployModalOpen}
-        onClose={() => setIsDeployModalOpen(false)}
-        harvestZones={telemetry?.harvest_zones || []}
-      />
-
     </div>
-
   );
 }

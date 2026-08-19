@@ -64,10 +64,11 @@ export function FloatingControlDock({
       {/* Mission Progress Pill */}
       <div style={{ padding: "0 6px", fontSize: "0.74rem", fontWeight: 600, color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
         {isOrchard ? (
-          <span>🍎 {Math.round(fruitsPicked)} / 1,200</span>
+          <span>{Math.round(fruitsPicked)} / 1,200 HARVESTED</span>
         ) : (
-          <span>{Math.round(progressPct)}% Complete</span>
+          <span>{Math.round(progressPct)}% COMPLETE</span>
         )}
+
       </div>
 
       <div className="dock-divider" />

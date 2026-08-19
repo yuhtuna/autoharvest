@@ -663,177 +663,47 @@ export function FieldMap2D({
   };
 
   return (
-    <div className="map-panel" style={{ height: "100%", flex: 1 }}>
-      
-      {/* Top Map Toolbar */}
-      <div className="map-header-bar">
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <Crosshair size={15} color="var(--color-brand)" />
-          <span style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-main)" }}>
-            {viewMode === "3D_CAB_POV" ? "3D First-Person Tractor Cab Camera" : "Digital Twin Field Radar"}
+    <div className="map-panel" style={{ height: "100%", flex: 1, position: "relative" }}>
+      {/* Quiet Top Map Bar */}
+      <div style={{
+        position: "absolute",
+        top: "10px",
+        left: "12px",
+        right: "12px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        pointerEvents: "none",
+        zIndex: 10
+      }}>
+        {/* Field Info Tag */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          padding: "4px 10px",
+          background: "rgba(8, 12, 20, 0.85)",
+          border: "1px solid var(--border-subtle)",
+          borderRadius: "var(--radius-sm)",
+          pointerEvents: "auto"
+        }}>
+          <Crosshair size={13} color="var(--color-brand)" />
+          <span style={{ fontSize: "0.74rem", fontWeight: 600, color: "var(--text-main)" }}>
+            {viewMode === "3D_CAB_POV" ? "3D Operator POV" : "Field Digital Twin"}
           </span>
-          <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-            ({fieldPreset?.area_hectares} ha • {fieldPreset?.name})
+          <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+            {fieldPreset?.area_hectares} ha
           </span>
         </div>
 
-        {/* View Mode & Layer Toggles */}
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", position: "relative" }}>
-          
-          {/* Unit Deployment Dropdown Button */}
-          <div style={{ position: "relative" }}>
-            <button
-              onClick={() => {
-                setShowDeployMenu(!showDeployMenu);
-                setShowZoneMenu(false);
-              }}
-              className="speed-pill active"
-              style={{ display: "flex", alignItems: "center", gap: "4px", background: "rgba(56, 189, 248, 0.18)", color: "#38bdf8", border: "1px solid rgba(56, 189, 248, 0.4)" }}
-            >
-              <Plus size={12} /> {deployMode ? `Click Map to Place ${deployMode}` : "Deploy Unit"}
-            </button>
-
-            {showDeployMenu && (
-              <div 
-                style={{
-                  position: "absolute",
-                  top: "100%",
-                  right: 0,
-                  marginTop: "6px",
-                  background: "rgba(10, 16, 26, 0.95)",
-                  border: "1px solid var(--border-color)",
-                  borderRadius: "8px",
-                  padding: "6px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "4px",
-                  zIndex: 100,
-                  width: "200px"
-                }}
-              >
-                {[
-                  { type: "RECON_DRONE", label: "Recon Drone Alpha", color: "#38bdf8" },
-                  { type: "HUMAN_FIELD_CREW", label: "Human Pick Crew", color: "#34d399" },
-                  { type: "ROBOTIC_PICKER", label: "Delta Orchard Rover", color: "#c084fc" },
-                  { type: "COMBINE_HARVESTER", label: "Heavy Combine", color: "#fbbf24" },
-                  { type: "GRAIN_CHASER_CART", label: "Grain Chaser Cart", color: "#a7f3d0" },
-                ].map((u) => (
-                  <button
-                    key={u.type}
-                    onClick={() => {
-                      setDeployMode(u.type);
-                      setShowDeployMenu(false);
-                    }}
-                    style={{
-                      background: "rgba(17, 24, 39, 0.8)",
-                      color: u.color,
-                      border: "1px solid rgba(255,255,255,0.06)",
-                      padding: "6px 8px",
-                      borderRadius: "5px",
-                      fontSize: "0.72rem",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      textAlign: "left"
-                    }}
-                  >
-                    {u.label}
-                  </button>
-                ))}
-
-                <button
-                  onClick={() => {
-                    setShowDeployMenu(false);
-                    if (onOpenDeployModal) onOpenDeployModal();
-                  }}
-                  style={{
-                    background: "rgba(56, 189, 248, 0.15)",
-                    color: "#38bdf8",
-                    border: "1px solid rgba(56, 189, 248, 0.3)",
-                    padding: "6px 8px",
-                    borderRadius: "5px",
-                    fontSize: "0.72rem",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    textAlign: "center",
-                    marginTop: "4px"
-                  }}
-                >
-                  Advanced Deployment Dock...
-                </button>
-
-              </div>
-            )}
-          </div>
-
-          {/* Zone Mapping Dropdown Button */}
-          <div style={{ position: "relative" }}>
-            <button
-              onClick={() => {
-                setShowZoneMenu(!showZoneMenu);
-                setShowDeployMenu(false);
-              }}
-              className="speed-pill active"
-              style={{ display: "flex", alignItems: "center", gap: "4px", background: "rgba(16, 185, 129, 0.18)", color: "#34d399", border: "1px solid rgba(16, 185, 129, 0.4)" }}
-            >
-              <MapPin size={12} /> {zoneMode ? `Click Map to Place ${zoneMode}` : "Map Zone"}
-            </button>
-
-            {showZoneMenu && (
-              <div 
-                style={{
-                  position: "absolute",
-                  top: "100%",
-                  right: 0,
-                  marginTop: "6px",
-                  background: "rgba(10, 16, 26, 0.95)",
-                  border: "1px solid var(--border-color)",
-                  borderRadius: "8px",
-                  padding: "6px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "4px",
-                  zIndex: 100,
-                  width: "210px"
-                }}
-              >
-                {[
-                  { type: "PRIORITY_HARVEST", label: "High-Brix Priority Sector", color: "#10b981" },
-                  { type: "QUARANTINE_BLIGHT", label: "Fungal Blight Quarantine", color: "#ef4444" },
-                  { type: "STAGING_HEADLAND", label: "Headland Staging Area", color: "#fbbf24" },
-                ].map((z) => (
-
-                  <button
-                    key={z.type}
-                    onClick={() => {
-                      setZoneMode(z.type);
-                      setShowZoneMenu(false);
-                    }}
-                    style={{
-                      background: "rgba(17, 24, 39, 0.8)",
-                      color: z.color,
-                      border: "1px solid rgba(255,255,255,0.06)",
-                      padding: "6px 8px",
-                      borderRadius: "5px",
-                      fontSize: "0.72rem",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      textAlign: "left"
-                    }}
-                  >
-                    {z.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* 2D vs 3D Cab POV Switcher */}
+        {/* Minimal Controls (Zoom & POV Toggle) */}
+        <div style={{ display: "flex", alignItems: "center", gap: "4px", pointerEvents: "auto" }}>
           <button
             onClick={() => setViewMode(viewMode === "2D_RADAR" ? "3D_CAB_POV" : "2D_RADAR")}
-            className="speed-pill active"
-            style={{ display: "flex", alignItems: "center", gap: "4px", background: "rgba(255, 255, 255, 0.08)", color: "var(--text-main)", border: "1px solid var(--border-color)" }}
+            className="speed-pill"
+            style={{ display: "flex", alignItems: "center", gap: "4px", background: "rgba(8, 12, 20, 0.85)", border: "1px solid var(--border-subtle)" }}
           >
-            <Camera size={12} /> {viewMode === "2D_RADAR" ? "3D POV" : "2D Radar"}
+            <Camera size={11} /> {viewMode === "2D_RADAR" ? "3D POV" : "2D Map"}
           </button>
 
           {viewMode === "2D_RADAR" && (
@@ -841,87 +711,49 @@ export function FieldMap2D({
               <button
                 onClick={() => setShowNDVI(!showNDVI)}
                 className={`speed-pill ${showNDVI ? "active" : ""}`}
+                style={{ background: "rgba(8, 12, 20, 0.85)", border: "1px solid var(--border-subtle)" }}
               >
                 NDVI
               </button>
               <button
-                onClick={() => setShowTrajectories(!showTrajectories)}
-                className={`speed-pill ${showTrajectories ? "active" : ""}`}
-              >
-                Swaths
-              </button>
-              
-              {/* Zoom Buttons */}
-              <button
                 onClick={() => setZoom((z) => Math.min(2.5, z + 0.2))}
                 className="speed-pill"
                 title="Zoom In"
+                style={{ background: "rgba(8, 12, 20, 0.85)", border: "1px solid var(--border-subtle)" }}
               >
-                <ZoomIn size={12} />
+                <ZoomIn size={11} />
               </button>
               <button
                 onClick={() => setZoom((z) => Math.max(0.6, z - 0.2))}
                 className="speed-pill"
                 title="Zoom Out"
+                style={{ background: "rgba(8, 12, 20, 0.85)", border: "1px solid var(--border-subtle)" }}
               >
-                <ZoomOut size={12} />
+                <ZoomOut size={11} />
               </button>
               <button
                 onClick={() => setZoom(1.0)}
                 className="speed-pill"
-                title="Reset Zoom"
+                title="Reset View"
+                style={{ background: "rgba(8, 12, 20, 0.85)", border: "1px solid var(--border-subtle)" }}
               >
-                <RefreshCw size={12} />
+                <RefreshCw size={11} />
               </button>
             </>
           )}
-
         </div>
       </div>
 
-      {/* Placement Prompt Banner if in active deployment mode */}
-      {(deployMode || zoneMode) && (
-        <div 
-          style={{
-            position: "absolute",
-            top: "50px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "rgba(14, 116, 144, 0.95)",
-            color: "#ffffff",
-            padding: "6px 16px",
-            borderRadius: "20px",
-            fontSize: "0.75rem",
-            fontWeight: 700,
-            zIndex: 10,
-            boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
-            border: "1px solid #38bdf8",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px"
-          }}
-        >
-          <Sparkles size={14} />
-          <span>Click anywhere on the map to place {deployMode ? `Unit: ${deployMode}` : `Harvest Zone: ${zoneMode}`}</span>
-          <button 
-            onClick={() => { setDeployMode(null); setZoneMode(null); }}
-            style={{ background: "none", border: "none", color: "#ffffff", cursor: "pointer", fontWeight: 800, padding: "0 4px" }}
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
       {/* Interactive Canvas Container */}
-      <div style={{ flex: 1, position: "relative", minHeight: "360px", background: "#060911" }}>
+      <div style={{ flex: 1, width: "100%", height: "100%", position: "relative", background: "#060911" }}>
         <canvas
           ref={canvasRef}
           onClick={handleCanvasClick}
-          style={{ width: "100%", height: "100%", display: "block", cursor: (deployMode || zoneMode) ? "crosshair" : "default" }}
+          style={{ width: "100%", height: "100%", display: "block" }}
         />
       </div>
-
     </div>
   );
 }
+
 
