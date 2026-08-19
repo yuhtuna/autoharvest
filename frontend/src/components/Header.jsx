@@ -19,8 +19,9 @@ export function Header({
         </div>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span className="top-nav-title">AutoHarvest Fleet OS</span>
+            <span className="top-nav-title">AutoHarvest</span>
             <span 
+
               style={{ 
                 fontSize: "0.65rem", 
                 fontWeight: 600, 

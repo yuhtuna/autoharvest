@@ -42,8 +42,9 @@ export function FieldMap2D({
   
   // Layer visibility state
   const [viewMode, setViewMode] = useState("2D_RADAR"); // '2D_RADAR' or '3D_CAB_POV'
-  const [showNDVI, setShowNDVI] = useState(true);
+  const [activeLayer, setActiveLayer] = useState("NDVI"); // 'NDVI' | 'MOISTURE' | 'SATELLITE'
   const [showTrajectories, setShowTrajectories] = useState(true);
+
   const [showHeadlands, setShowHeadlands] = useState(true);
   const [showCutTrail, setShowCutTrail] = useState(true);
   const [zoom, setZoom] = useState(1.0);
@@ -218,9 +219,10 @@ export function FieldMap2D({
     const minLat = Math.min(...lats);
     const maxLat = Math.max(...lats);
 
-    const pad = 48;
-    const availW = width - pad * 2;
-    const availH = height - pad * 2;
+    const padX = 42;
+    const padY = 68;
+    const availW = width - padX * 2;
+    const availH = height - padY * 2;
 
     const toCanvasX = (lon) => {
       const norm = (lon - minLon) / (maxLon - minLon);
@@ -235,7 +237,7 @@ export function FieldMap2D({
     };
 
     // 1. Draw Field Background Grid & Boundary
-    ctx.fillStyle = "#0c131d";
+    ctx.fillStyle = "#090e17";
     ctx.beginPath();
     polygon.forEach((pt, idx) => {
       const px = toCanvasX(pt[0]);
@@ -246,9 +248,9 @@ export function FieldMap2D({
     ctx.closePath();
     ctx.fill();
 
-    // 2. Draw NDVI Heatmap Raster Layer (if enabled)
+    // 2. Draw Multi-Spectral Heatmap Raster Layer (NDVI / Moisture / Soil)
     const ndviMatrix = missionPlan?.vision_details?.ndvi_matrix;
-    if (showNDVI && ndviMatrix && ndviMatrix.length > 0) {
+    if (activeLayer !== "NONE" && ndviMatrix && ndviMatrix.length > 0) {
       const gridRows = ndviMatrix.length;
       const gridCols = ndviMatrix[0].length;
       const stepX = (maxLon - minLon) / gridCols;
@@ -265,13 +267,20 @@ export function FieldMap2D({
           const x1 = toCanvasX(cellLon + stepX);
           const y1 = toCanvasY(cellLat - stepY);
 
-          let color = "rgba(16, 185, 129, 0.4)";
-          if (val < 0.45) {
-            color = `rgba(239, 68, 68, ${0.45 + (0.45 - val) * 0.5})`;
-          } else if (val < 0.72) {
-            color = `rgba(245, 158, 11, ${0.35 + (0.72 - val) * 0.3})`;
-          } else {
-            color = `rgba(16, 185, 129, ${0.35 + (val - 0.72) * 0.5})`;
+          let color = "rgba(16, 185, 129, 0.35)";
+          if (activeLayer === "NDVI") {
+            if (val < 0.45) {
+              color = `rgba(239, 68, 68, ${0.35 + (0.45 - val) * 0.45})`;
+            } else if (val < 0.72) {
+              color = `rgba(245, 158, 11, ${0.28 + (0.72 - val) * 0.25})`;
+            } else {
+              color = `rgba(16, 185, 129, ${0.28 + (val - 0.72) * 0.45})`;
+            }
+          } else if (activeLayer === "MOISTURE") {
+            const mVal = (val * 0.6) + 0.2;
+            color = `rgba(14, 165, 233, ${0.15 + mVal * 0.45})`;
+          } else if (activeLayer === "SATELLITE") {
+            color = `rgba(15, 23, 42, ${0.45 + val * 0.25})`;
           }
 
           ctx.fillStyle = color;
@@ -279,6 +288,8 @@ export function FieldMap2D({
         }
       }
     }
+
+
 
     // 3. Draw Headland Buffer Boundary
     if (showHeadlands) {
@@ -505,14 +516,22 @@ export function FieldMap2D({
 
       ctx.restore();
 
-      // Harvester Label Tag
-      ctx.fillStyle = isEstop ? "#fca5a5" : (isOrchard ? "#38bdf8" : "#a7f3d0");
-      ctx.font = "bold 11px JetBrains Mono, monospace";
-      ctx.fillText(
-        `${telemetry.harvester_id} [${telemetry.speed_kmh} km/h]`,
-        hx + 18,
-        hy - 14
-      );
+      // Harvester Label HUD Chip
+      const hColor = isEstop ? "#ef4444" : (isOrchard ? "#38bdf8" : "#10b981");
+      const hText = `${telemetry.harvester_id} [${telemetry.speed_kmh} km/h]`;
+      ctx.font = "bold 9.5px 'JetBrains Mono', monospace";
+      const hTextWidth = ctx.measureText(hText).width;
+      
+      ctx.fillStyle = "rgba(8, 12, 20, 0.88)";
+      ctx.strokeStyle = hColor;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(hx + 14, hy - 18, hTextWidth + 16, 18, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = hColor;
+      ctx.fillText(hText, hx + 22, hy - 5);
 
       // SWARM GRAIN CART (Chaser Tractor) Unload On-The-Go Rendezvous (if hopper > 60%)
       if (!isOrchard && tankLevel > 60) {
@@ -539,7 +558,7 @@ export function FieldMap2D({
         ctx.setLineDash([]);
 
         ctx.fillStyle = "#38bdf8";
-        ctx.font = "bold 10px JetBrains Mono, monospace";
+        ctx.font = "bold 9px 'JetBrains Mono', monospace";
         ctx.fillText("GRAIN_CART_01 [UNLOADING]", cartX - 40, cartY - 18);
       }
     }
@@ -617,22 +636,29 @@ export function FieldMap2D({
         ctx.fillRect(-9, -13, 18, 26);
       }
 
-
       ctx.restore();
 
-      // Floating Unit Label Tag
-      ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
-      ctx.fillRect(ux + 14, uy - 12, 175, 20);
-      ctx.strokeStyle = unit.color || "#38bdf8";
+      // Floating Unit Label HUD Chip
+      const uColor = unit.color || "#38bdf8";
+      const uText = `${unit.unit_name}`;
+      ctx.font = "bold 9px 'JetBrains Mono', monospace";
+      const textWidth = ctx.measureText(uText).width;
+      
+      ctx.fillStyle = "rgba(8, 12, 20, 0.88)";
+      ctx.strokeStyle = uColor;
       ctx.lineWidth = 1;
-      ctx.strokeRect(ux + 14, uy - 12, 175, 20);
+      ctx.beginPath();
+      ctx.roundRect(ux + 14, uy - 10, textWidth + 14, 18, 4);
+      ctx.fill();
+      ctx.stroke();
 
-      ctx.fillStyle = unit.color || "#38bdf8";
-      ctx.font = "bold 9.5px JetBrains Mono, monospace";
-      ctx.fillText(`${unit.unit_name}`, ux + 18, uy + 2);
+      ctx.fillStyle = uColor;
+      ctx.fillText(uText, ux + 21, uy + 3);
     });
 
-  }, [fieldPreset, missionPlan, telemetry, activeObstacle, activeScenario, showNDVI, showTrajectories, showHeadlands, showCutTrail, zoom, viewMode]);
+
+  }, [fieldPreset, missionPlan, telemetry, activeObstacle, activeScenario, activeLayer, showTrajectories, showHeadlands, showCutTrail, zoom, viewMode]);
+
 
   // Handle canvas click to place deployed units or mapped zones
   const handleCanvasClick = async (e) => {
@@ -780,13 +806,25 @@ export function FieldMap2D({
                 <Edit3 size={11} /> {isEditMode ? "Done Editing" : "Manual Reroute"}
               </button>
 
-              <button
-                onClick={() => setShowNDVI(!showNDVI)}
-                className={`speed-pill ${showNDVI ? "active" : ""}`}
-                style={{ background: "rgba(8, 12, 20, 0.85)", border: "1px solid var(--border-subtle)" }}
+              {/* Multi-Spectral Layer Dropdown */}
+              <select
+                value={activeLayer}
+                onChange={(e) => setActiveLayer(e.target.value)}
+                className="speed-pill"
+                style={{ 
+                  background: "rgba(8, 12, 20, 0.85)", 
+                  border: "1px solid var(--border-subtle)", 
+                  color: "var(--text-main)",
+                  fontSize: "0.68rem",
+                  padding: "3px 6px",
+                  cursor: "pointer"
+                }}
               >
-                NDVI
-              </button>
+                <option value="NDVI">NDVI Vigor</option>
+                <option value="MOISTURE">Soil Moisture</option>
+                <option value="SATELLITE">Satellite GIS</option>
+              </select>
+
               <button
                 onClick={() => setZoom((z) => Math.min(2.5, z + 0.2))}
                 className="speed-pill"
