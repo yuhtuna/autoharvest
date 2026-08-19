@@ -36,7 +36,8 @@ export function Header({
                 border: isOrchard ? "1px solid rgba(56, 189, 248, 0.25)" : "1px solid rgba(16, 185, 129, 0.25)"
               }}
             >
-              {isOrchard ? "🍎 Orchard Picker Mode" : "🌾 Combine Fleet Mode"}
+              {isOrchard ? "ORCHARD PICKER MODE" : "BROADACRE COMBINE MODE"}
+
             </span>
           </div>
           <div className="top-nav-subtitle">Agents for Humans • AWS Multi-Agent Precision Agronomy</div>

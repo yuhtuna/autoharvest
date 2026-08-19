@@ -1,12 +1,12 @@
 import React, { useState } from "react";
-import { X, ShieldAlert, Cpu, Radio, Truck, User, Bot, Sparkles, MapPin } from "lucide-react";
+import { X, ShieldAlert, Cpu, Radio, Truck, User, Bot, Sparkles, MapPin, Activity, Compass, Flame } from "lucide-react";
 import { deployUnit } from "../services/api";
 
 const UNIT_TYPES = [
   {
     type: "RECON_DRONE",
     name: "Multispectral Recon Drone",
-    icon: "🚁",
+    icon: <Radio size={18} color="#38bdf8" />,
     desc: "Autonomous aerial NDVI & Brix scouting drone",
     color: "#38bdf8",
     defaultName: "DJI Agras T40 Drone",
@@ -14,7 +14,7 @@ const UNIT_TYPES = [
   {
     type: "COMBINE_HARVESTER",
     name: "Heavy Combine Harvester",
-    icon: "🚜",
+    icon: <Truck size={18} color="#fbbf24" />,
     desc: "30-ton autonomous combine with 40ft header",
     color: "#fbbf24",
     defaultName: "John Deere X9 1100",
@@ -22,7 +22,7 @@ const UNIT_TYPES = [
   {
     type: "UTILITY_TRACTOR",
     name: "Utility Field Tractor",
-    icon: "🚜",
+    icon: <Truck size={18} color="#f59e0b" />,
     desc: "High-torque multi-tool utility tractor",
     color: "#f59e0b",
     defaultName: "Fendt 1000 Vario",
@@ -30,7 +30,7 @@ const UNIT_TYPES = [
   {
     type: "ROBOTIC_PICKER",
     name: "Delta Robotic Fruit Picker",
-    icon: "🤖",
+    icon: <Bot size={18} color="#c084fc" />,
     desc: "Quad 3D stereo vision picking arm rover",
     color: "#c084fc",
     defaultName: "Orchard Picker Rover #2",
@@ -39,6 +39,7 @@ const UNIT_TYPES = [
     type: "GRAIN_CHASER_CART",
     name: "Autonomous Grain Cart",
     icon: "🚛",
+    icon: <Truck size={18} color="#a7f3d0" />,
     desc: "Chaser grain cart for unload-on-the-go",
     color: "#a7f3d0",
     defaultName: "Unload Grain Cart #1",
@@ -46,7 +47,7 @@ const UNIT_TYPES = [
   {
     type: "HUMAN_FIELD_CREW",
     name: "Human Hand Pick Team",
-    icon: "👨‍🌾",
+    icon: <User size={18} color="#34d399" />,
     desc: "Selective harvesting & delicate pruning crew",
     color: "#34d399",
     defaultName: "Human Select Pick Crew #4",
@@ -54,12 +55,13 @@ const UNIT_TYPES = [
   {
     type: "HUMAN_AGRONOMIST",
     name: "Agronomist Inspector",
-    icon: "🔬",
+    icon: <Activity size={18} color="#ec4899" />,
     desc: "Field pathology specialist & soil auditor",
     color: "#ec4899",
     defaultName: "Dr. Evans (Agronomy Lead)",
   },
 ];
+
 
 export function DeploymentModal({ isOpen, onClose, harvestZones = [], onDeployed }) {
   const [selectedType, setSelectedType] = useState("RECON_DRONE");
@@ -156,7 +158,8 @@ export function DeploymentModal({ isOpen, onClose, harvestZones = [], onDeployed
                       gap: "10px"
                     }}
                   >
-                    <span style={{ fontSize: "1.3rem" }}>{u.icon}</span>
+                    <div style={{ flexShrink: 0, display: "flex", alignItems: "center" }}>{u.icon}</div>
+
                     <div>
                       <div style={{ fontSize: "0.78rem", fontWeight: 700, color: isSelected ? u.color : "#f3f4f6" }}>
                         {u.name}

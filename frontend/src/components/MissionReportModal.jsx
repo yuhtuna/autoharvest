@@ -260,10 +260,13 @@ export function MissionReportModal({
                   border: "1px solid rgba(16, 185, 129, 0.3)",
                   fontSize: "0.75rem",
                   fontWeight: 700,
-                  textDecoration: "none"
+                  textDecoration: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px"
                 }}
               >
-                🗺️ Export GeoJSON
+                <FileText size={14} /> Export GeoJSON
               </a>
 
               <a
@@ -278,10 +281,13 @@ export function MissionReportModal({
                   border: "1px solid rgba(56, 189, 248, 0.3)",
                   fontSize: "0.75rem",
                   fontWeight: 700,
-                  textDecoration: "none"
+                  textDecoration: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px"
                 }}
               >
-                📊 Download CSV Audit
+                <TrendingUp size={14} /> Download CSV Audit
               </a>
 
               <a
@@ -296,12 +302,16 @@ export function MissionReportModal({
                   border: "1px solid rgba(245, 158, 11, 0.3)",
                   fontSize: "0.75rem",
                   fontWeight: 700,
-                  textDecoration: "none"
+                  textDecoration: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px"
                 }}
               >
-                📜 Export Full JSON
+                <FileText size={14} /> Export Full JSON
               </a>
             </div>
+
 
             <div style={{ display: "flex", gap: "8px" }}>
               <button

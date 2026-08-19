@@ -316,8 +316,9 @@ export function FieldMap2D({
 
       ctx.fillStyle = zone.color_hex || "#10b981";
       ctx.font = "bold 9.5px JetBrains Mono, monospace";
-      ctx.fillText(`🗺️ ${zone.name}`, zx0 + 8, zy0 + 18);
+      ctx.fillText(`${zone.name}`, zx0 + 8, zy0 + 18);
     });
+
 
 
     // 4. Draw Waypoint Trajectory Paths
@@ -711,11 +712,11 @@ export function FieldMap2D({
                 }}
               >
                 {[
-                  { type: "RECON_DRONE", label: "🚁 Recon Drone", color: "#38bdf8" },
-                  { type: "HUMAN_FIELD_CREW", label: "👨‍🌾 Human Pick Crew", color: "#34d399" },
-                  { type: "ROBOTIC_PICKER", label: "🤖 Delta Orchard Rover", color: "#c084fc" },
-                  { type: "COMBINE_HARVESTER", label: "🚜 Heavy Combine", color: "#fbbf24" },
-                  { type: "GRAIN_CHASER_CART", label: "🚛 Grain Chaser Cart", color: "#a7f3d0" },
+                  { type: "RECON_DRONE", label: "Recon Drone Alpha", color: "#38bdf8" },
+                  { type: "HUMAN_FIELD_CREW", label: "Human Pick Crew", color: "#34d399" },
+                  { type: "ROBOTIC_PICKER", label: "Delta Orchard Rover", color: "#c084fc" },
+                  { type: "COMBINE_HARVESTER", label: "Heavy Combine", color: "#fbbf24" },
+                  { type: "GRAIN_CHASER_CART", label: "Grain Chaser Cart", color: "#a7f3d0" },
                 ].map((u) => (
                   <button
                     key={u.type}
@@ -757,7 +758,7 @@ export function FieldMap2D({
                     marginTop: "4px"
                   }}
                 >
-                  ⚙️ Advanced Deployment Dock...
+                  Advanced Deployment Dock...
                 </button>
 
               </div>
@@ -796,10 +797,11 @@ export function FieldMap2D({
                 }}
               >
                 {[
-                  { type: "PRIORITY_HARVEST", label: "🟩 High-Brix Priority Sector", color: "#10b981" },
-                  { type: "QUARANTINE_BLIGHT", label: "🟥 Fungal Blight Quarantine", color: "#ef4444" },
-                  { type: "STAGING_HEADLAND", label: "🟨 Headland Staging Area", color: "#fbbf24" },
+                  { type: "PRIORITY_HARVEST", label: "High-Brix Priority Sector", color: "#10b981" },
+                  { type: "QUARANTINE_BLIGHT", label: "Fungal Blight Quarantine", color: "#ef4444" },
+                  { type: "STAGING_HEADLAND", label: "Headland Staging Area", color: "#fbbf24" },
                 ].map((z) => (
+
                   <button
                     key={z.type}
                     onClick={() => {
