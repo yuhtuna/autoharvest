@@ -245,9 +245,90 @@ export function MissionReportModal({
             <span>Deterministic Interlock: &lt;15ms Response SLA</span>
           </div>
 
+          {/* Action Buttons Footer */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "12px", borderTop: "1px solid #1e293b", marginTop: "10px" }}>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <a
+                href="http://localhost:8020/api/v1/export/zones-geojson"
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  padding: "7px 12px",
+                  borderRadius: "6px",
+                  background: "rgba(16, 185, 129, 0.12)",
+                  color: "#34d399",
+                  border: "1px solid rgba(16, 185, 129, 0.3)",
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                  textDecoration: "none"
+                }}
+              >
+                🗺️ Export GeoJSON
+              </a>
+
+              <a
+                href={`http://localhost:8020/api/v1/export/harvest-csv?crop_type=${currentFieldPreset?.crop_type || "APPLES_HONEYCRISP"}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  padding: "7px 12px",
+                  borderRadius: "6px",
+                  background: "rgba(56, 189, 248, 0.12)",
+                  color: "#38bdf8",
+                  border: "1px solid rgba(56, 189, 248, 0.3)",
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                  textDecoration: "none"
+                }}
+              >
+                📊 Download CSV Audit
+              </a>
+
+              <a
+                href={`http://localhost:8020/api/v1/export/mission-json?field_id=${currentFieldPreset?.id || "FIELD_NE_LOT_4B"}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  padding: "7px 12px",
+                  borderRadius: "6px",
+                  background: "rgba(245, 158, 11, 0.12)",
+                  color: "#fbbf24",
+                  border: "1px solid rgba(245, 158, 11, 0.3)",
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                  textDecoration: "none"
+                }}
+              >
+                📜 Export Full JSON
+              </a>
+            </div>
+
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                onClick={handlePrint}
+                style={{
+                  padding: "7px 14px",
+                  borderRadius: "6px",
+                  background: "var(--color-brand)",
+                  color: "#0f172a",
+                  border: "none",
+                  fontSize: "0.78rem",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px"
+                }}
+              >
+                <Printer size={14} /> Print / Save PDF
+              </button>
+            </div>
+          </div>
+
         </div>
 
       </div>
     </div>
   );
 }
+

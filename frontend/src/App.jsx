@@ -8,6 +8,7 @@ import { CleanTelemetrySidebar } from "./components/CleanTelemetrySidebar";
 import { DroneVisionModal } from "./components/DroneVisionModal";
 import { AgriCopilotModal } from "./components/AgriCopilotModal";
 import { MissionReportModal } from "./components/MissionReportModal";
+import { DeploymentModal } from "./components/DeploymentModal";
 
 import { fetchFields, scanField, triggerScenario, sendFleetControl } from "./services/api";
 import { fleetWS } from "./services/websocket";
@@ -26,6 +27,8 @@ export default function App() {
   const [isDroneModalOpen, setIsDroneModalOpen] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
+
 
   const hasCelebratedRef = useRef(false);
 
@@ -186,6 +189,7 @@ export default function App() {
             telemetry={telemetry}
             activeObstacle={activeObstacle}
             activeScenario={activeScenario}
+            onOpenDeployModal={() => setIsDeployModalOpen(true)}
           />
 
           {/* Floating Modern Control Dock */}
@@ -238,7 +242,14 @@ export default function App() {
         currentFieldPreset={currentFieldPreset}
       />
 
+      {/* 6. Multi-Unit Equipment & Crew Deployment Modal */}
+      <DeploymentModal
+        isOpen={isDeployModalOpen}
+        onClose={() => setIsDeployModalOpen(false)}
+        harvestZones={telemetry?.harvest_zones || []}
+      />
 
     </div>
+
   );
 }

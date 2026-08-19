@@ -27,7 +27,9 @@ export function FieldMap2D({
   telemetry,
   activeObstacle,
   activeScenario,
+  onOpenDeployModal,
 }) {
+
   const canvasRef = useRef(null);
   
   // Layer visibility state
@@ -533,11 +535,32 @@ export function FieldMap2D({
         ctx.lineWidth = 2;
         ctx.strokeRect(-12, -8, 24, 16);
 
+      } else if (unit.unit_type === "UTILITY_TRACTOR") {
+        // Utility Field Tractor (Amber)
+        ctx.fillStyle = "#f59e0b";
+        ctx.fillRect(-10, -14, 20, 28);
+        ctx.fillStyle = "#38bdf8";
+        ctx.fillRect(-7, -2, 14, 6);
+
+      } else if (unit.unit_type === "HUMAN_AGRONOMIST") {
+        // Agronomist Inspector (Pink Pulse)
+        ctx.fillStyle = "rgba(236, 72, 153, 0.35)";
+        ctx.beginPath();
+        ctx.arc(0, 0, 18, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#ec4899";
+        ctx.beginPath();
+        ctx.arc(0, -4, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillRect(-6, 2, 12, 8);
+
       } else if (unit.unit_type === "GRAIN_CHASER_CART") {
         // Autonomous Grain Cart
         ctx.fillStyle = "#0284c7";
         ctx.fillRect(-9, -13, 18, 26);
       }
+
 
       ctx.restore();
 
@@ -715,6 +738,28 @@ export function FieldMap2D({
                     {u.label}
                   </button>
                 ))}
+
+                <button
+                  onClick={() => {
+                    setShowDeployMenu(false);
+                    if (onOpenDeployModal) onOpenDeployModal();
+                  }}
+                  style={{
+                    background: "rgba(56, 189, 248, 0.15)",
+                    color: "#38bdf8",
+                    border: "1px solid rgba(56, 189, 248, 0.3)",
+                    padding: "6px 8px",
+                    borderRadius: "5px",
+                    fontSize: "0.72rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    textAlign: "center",
+                    marginTop: "4px"
+                  }}
+                >
+                  ⚙️ Advanced Deployment Dock...
+                </button>
+
               </div>
             )}
           </div>

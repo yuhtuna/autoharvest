@@ -2,7 +2,11 @@
 REST API Routes for AutoHarvest Platform
 """
 from typing import List, Dict, Any
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
+import json
+import csv
+import io
+
 
 from api.schemas import (
     ScanFieldRequest,
@@ -459,6 +463,148 @@ async def remove_harvest_zone(zone_id: str):
         "harvest_zones": ws_manager.harvest_zones,
     })
     return {"status": "ZONE_REMOVED", "zone_id": zone_id}
+
+
+# ==========================================
+# EXPORT ENGINE APIS (GeoJSON, CSV, JSON)
+# ==========================================
+
+@router.get("/export/mission-json")
+def export_mission_json(field_id: str = "FIELD_NE_LOT_4B"):
+    """
+    Exports full multi-agent mission plan, economic arbitrage, yield forecasts,
+    and ESG carbon certificates as a downloadable JSON file.
+    """
+    preset = FIELD_PRESETS.get(field_id, FIELD_PRESETS["FIELD_NE_LOT_4B"])
+    plan = ws_manager.current_plan or orchestrator.plan_harvest(
+        field_id=preset.id,
+        crop_type=preset.crop_type,
+        polygon=preset.coordinates_polygon,
+        soil_moisture_pct=preset.default_moisture_pct,
+        soil_temp_c=preset.default_temp_c,
+    )
+    
+    export_payload = {
+        "export_standard": "AUTOHARVEST_ISO_11783_MISSION_SPEC",
+        "timestamp": "2026-08-18T21:24:00Z",
+        "field_metadata": preset.dict(),
+        "mission_plan": plan,
+        "deployed_units": ws_manager.deployed_units,
+        "harvest_zones": ws_manager.harvest_zones,
+    }
+    
+    content = json.dumps(export_payload, indent=2)
+    return Response(
+        content=content,
+        media_type="application/json",
+        headers={"Content-Disposition": f"attachment; filename=autoharvest_mission_{field_id}.json"}
+    )
+
+
+@router.get("/export/zones-geojson")
+def export_zones_geojson():
+    """
+    Exports mapped harvest zones and unit trajectories as standard OGC GeoJSON
+    for John Deere Operations Center, QGIS, or Climate FieldView.
+    """
+    features = []
+    
+    # 1. Export Mapped Harvest Zones as Polygons
+    for zone in ws_manager.harvest_zones:
+        poly = zone.get("coordinates_polygon", [])
+        if poly:
+            # Ensure closed polygon
+            if poly[0] != poly[-1]:
+                closed_poly = poly + [poly[0]]
+            else:
+                closed_poly = poly
+            
+            features.append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [closed_poly]
+                },
+                "properties": {
+                    "id": zone["id"],
+                    "name": zone["name"],
+                    "zone_type": zone["zone_type"],
+                    "area_hectares": zone.get("area_hectares", 10.0),
+                    "fill_color": zone.get("color_hex", "#10b981"),
+                    "status": zone.get("status", "ACTIVE")
+                }
+            })
+
+    # 2. Export Deployed Units as Points
+    for unit in ws_manager.deployed_units:
+        pos = unit.get("position")
+        if pos:
+            features.append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": pos
+                },
+                "properties": {
+                    "id": unit["id"],
+                    "name": unit["unit_name"],
+                    "unit_type": unit["unit_type"],
+                    "heading_deg": unit.get("heading_deg", 0.0),
+                    "status": unit.get("status", "ACTIVE")
+                }
+            })
+
+    geojson = {
+        "type": "FeatureCollection",
+        "name": "AutoHarvest_Digital_Twin_GIS_Layer",
+        "crs": {"type": "name", "properties": {"name": "urn:ogc:def:crs:OGC:1.3:CRS84"}},
+        "features": features
+    }
+    
+    return Response(
+        content=json.dumps(geojson, indent=2),
+        media_type="application/geo+json",
+        headers={"Content-Disposition": "attachment; filename=autoharvest_gis_layer.geojson"}
+    )
+
+
+@router.get("/export/harvest-csv")
+def export_harvest_csv(crop_type: str = "APPLES_HONEYCRISP"):
+    """
+    Exports fruit Brix spectrometry logs, 3D pick vectors, and pathogen risk alerts to CSV.
+    """
+    from engine.vision import CropVisionAgent
+    cv_agent = CropVisionAgent()
+    scan_res = cv_agent.analyze_custom_image(preset_id="HONEYCRISP_ORCHARD", crop_type=crop_type, detect_blight=True)
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Fruit_Target_ID", "Label", "Ripeness_Status", "Sugar_Brix_Deg", 
+        "Robotic_Pick_Target", "Confidence_Score", "Vector_X_mm", "Vector_Y_mm", "Vector_Z_mm"
+    ])
+    
+    for det in scan_res.get("detections", []):
+        vec = det.get("pick_vector_3d", {})
+        writer.writerow([
+            det.get("id", ""),
+            det.get("label", ""),
+            det.get("ripeness_status", ""),
+            det.get("sugar_brix", 0.0),
+            det.get("robotic_pick_target", False),
+            det.get("confidence", 0.0),
+            vec.get("x_mm", 0),
+            vec.get("y_mm", 0),
+            vec.get("z_depth_mm", 0),
+        ])
+    
+    content = output.getvalue()
+    return Response(
+        content=content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=autoharvest_spectrometry_{crop_type}.csv"}
+    )
+
 
 
 
