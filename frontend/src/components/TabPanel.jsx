@@ -335,14 +335,31 @@ export function TabPanel({
         )}
 
         {/* ========================================================= */}
-        {/* TAB 2: FLEET & ZONES */}
+        {/* TAB 2: FLEET & MULTI-ROBOT PATH PLANNING */}
         {/* ========================================================= */}
         {activeTab === "fleet" && (
           <>
+            {/* Multi-Agent Optimal Path Planning Metrics */}
+            <div className="summary-stat-grid">
+              <div className="summary-stat-box">
+                <div className="summary-stat-label">FLEET MAKESPAN ETA</div>
+                <div className="summary-stat-value" style={{ color: "var(--color-brand)" }}>
+                  {telemetry?.fleet_makespan_minutes ?? 38.5} <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontWeight: 500 }}>min</span>
+                </div>
+              </div>
+
+              <div className="summary-stat-box">
+                <div className="summary-stat-label">EFFICIENCY GAIN</div>
+                <div className="summary-stat-value" style={{ color: "var(--text-main)" }}>
+                  +{telemetry?.time_savings_pct ?? 0}% <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontWeight: 500 }}>speedup</span>
+                </div>
+              </div>
+            </div>
+
             {/* Inline Unit Deploy Form */}
             <div className="clean-card">
               <div className="clean-card-title">
-                <span>Deploy Fleet Unit</span>
+                <span>Deploy Unit (Auto-Replans Paths)</span>
                 <Plus size={13} color="var(--text-muted)" />
               </div>
 
@@ -383,56 +400,66 @@ export function TabPanel({
                   style={{ marginTop: "4px" }}
                 >
                   <Plus size={13} />
-                  <span>{isDeploying ? "Deploying..." : "Deploy Unit to Field"}</span>
+                  <span>{isDeploying ? "Synthesizing Paths..." : "Deploy & Partition Field"}</span>
                 </button>
               </form>
             </div>
 
-            {/* Active Deployed Units List */}
+            {/* Active Deployed Units List with Path Progress & ETA */}
             <div className="clean-card">
               <div className="clean-card-title">
                 <span>Active Units ({telemetry?.deployed_units?.length || 0})</span>
+                <span style={{ fontSize: "0.64rem", color: "var(--text-muted)" }}>m-CPP Optimized</span>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {telemetry?.deployed_units && telemetry.deployed_units.length > 0 ? (
                   telemetry.deployed_units.map((unit) => (
                     <div 
                       key={unit.id}
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "6px 8px",
+                        padding: "8px",
                         background: "rgba(0, 0, 0, 0.25)",
                         borderRadius: "4px",
                         border: "1px solid var(--border-subtle)",
                         fontSize: "0.74rem"
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: unit.color || "var(--color-brand)" }} />
-                        <div>
-                          <div style={{ color: "var(--text-main)", fontWeight: 600 }}>{unit.unit_name}</div>
-                          <div style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>{unit.unit_type}</div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: unit.color || "var(--color-brand)" }} />
+                          <div>
+                            <div style={{ color: "var(--text-main)", fontWeight: 600 }}>{unit.unit_name}</div>
+                            <div style={{ fontSize: "0.64rem", color: "var(--text-muted)" }}>{unit.unit_type}</div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ fontSize: "0.68rem", color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
+                            ETA {unit.eta_minutes ?? 20}m
+                          </span>
+                          {unit.unit_type !== "COMBINE_HARVESTER" && (
+                            <button
+                              onClick={async () => {
+                                try { await deleteUnit(unit.id); } catch (e) { console.error(e); }
+                              }}
+                              style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "2px" }}
+                              title="Remove unit"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
                         </div>
                       </div>
 
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "0.68rem", color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
-                          {unit.status}
-                        </span>
-                        {unit.unit_type !== "COMBINE_HARVESTER" && (
-                          <button
-                            onClick={async () => {
-                              try { await deleteUnit(unit.id); } catch (e) { console.error(e); }
-                            }}
-                            style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "2px" }}
-                            title="Remove unit"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        )}
+                      {/* Path Details & Progress Bar */}
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.65rem", color: "var(--text-muted)", marginBottom: "3px" }}>
+                        <span>Sector: {unit.assigned_area_ha ?? 12} ha</span>
+                        <span>Speed: {unit.speed_kmh ?? 6.8} km/h</span>
+                        <span className="mono">{unit.path_progress_pct ?? 0}% Path Done</span>
+                      </div>
+                      <div className="metric-bar-bg" style={{ height: "3px" }}>
+                        <div className="metric-bar-fill" style={{ width: `${unit.path_progress_pct ?? 0}%`, background: unit.color || "var(--color-brand)" }} />
                       </div>
                     </div>
                   ))
@@ -443,6 +470,7 @@ export function TabPanel({
                 )}
               </div>
             </div>
+
 
             {/* Inline Create Harvest Zone Form */}
             <div className="clean-card">

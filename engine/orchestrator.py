@@ -44,7 +44,9 @@ class AutoHarvestOrchestrator:
         obstacle_type: str = "HUMAN_IR_SIGNATURE",
         obstacle_coords: Optional[List[float]] = None,
         market_spike_override: float = 0.0,
+        deployed_units: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
+
         """
         Executes the full 5-agent cooperative workflow for a field mission scan.
         """
@@ -58,13 +60,13 @@ class AutoHarvestOrchestrator:
             moisture_pct=soil_moisture_pct,
         )
 
-        # Step 2: Kinematics & Robotics Path Agent
-        kinematics_res = self.kinematics.generate_coverage_path(
+        # Step 2: Kinematics & Multi-Unit Path Planning Agent (m-CPP)
+        kinematics_res = self.kinematics.generate_multi_unit_coverage_plans(
             polygon_coords=coordinates_polygon,
             crop_type=crop_type,
-            num_swaths=10,
-            points_per_swath=14,
+            deployed_units=deployed_units or None,
         )
+
 
         # Step 3: Soil & Climate Telemetry Agent
         telemetry_res = self.telemetry.assess_conditions(

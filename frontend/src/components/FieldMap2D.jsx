@@ -321,46 +321,88 @@ export function FieldMap2D({
 
 
 
-    // 4. Draw Waypoint Trajectory Paths
-    const waypoints = missionPlan?.kinematics_details?.waypoints || [];
-    const currentWpIdx = telemetry?.current_waypoint_idx || 0;
+    // 4. Draw Multi-Unit Waypoint Trajectory Paths & Capacity Partitions
+    const multiUnitPlans = telemetry?.multi_unit_plans || {};
+    const hasMultiPlans = Object.keys(multiUnitPlans).length > 0;
 
-    if (showTrajectories && waypoints.length > 1) {
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      waypoints.forEach((wp, idx) => {
-        const wx = toCanvasX(wp.lon);
-        const wy = toCanvasY(wp.lat);
-        if (idx === 0) ctx.moveTo(wx, wy);
-        else ctx.lineTo(wx, wy);
-      });
-      ctx.stroke();
+    if (showTrajectories) {
+      if (hasMultiPlans) {
+        // Draw each unit's assigned sub-polygon and boustrophedon sweep trajectory
+        Object.values(multiUnitPlans).forEach((plan) => {
+          const uWps = plan.waypoints || [];
+          const uColor = plan.color || "#fbbf24";
 
-      // Draw Planned Waypoint Dots
-      waypoints.forEach((wp, idx) => {
-        const wx = toCanvasX(wp.lon);
-        const wy = toCanvasY(wp.lat);
-        ctx.fillStyle = idx < currentWpIdx ? "#10b981" : "rgba(255, 255, 255, 0.35)";
-        ctx.beginPath();
-        ctx.arc(wx, wy, 2.5, 0, Math.PI * 2);
-        ctx.fill();
-      });
-    }
+          // Sub-polygon partition boundary (subtle dashed border)
+          if (plan.sub_polygon && plan.sub_polygon.length > 2 && Object.keys(multiUnitPlans).length > 1) {
+            ctx.strokeStyle = `${uColor}44`;
+            ctx.lineWidth = 1.0;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            plan.sub_polygon.forEach((pt, pIdx) => {
+              const px = toCanvasX(pt[0]);
+              const py = toCanvasY(pt[1]);
+              if (pIdx === 0) ctx.moveTo(px, py);
+              else ctx.lineTo(px, py);
+            });
+            ctx.closePath();
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
 
-    // 5. Draw Harvested Golden Swath Trails
-    if (showCutTrail && waypoints.length > 1 && currentWpIdx > 0) {
-      ctx.strokeStyle = "#fbbf24";
-      ctx.lineWidth = 4.0;
-      ctx.beginPath();
-      for (let i = 0; i <= Math.min(currentWpIdx, waypoints.length - 1); i++) {
-        const wx = toCanvasX(waypoints[i].lon);
-        const wy = toCanvasY(waypoints[i].lat);
-        if (i === 0) ctx.moveTo(wx, wy);
-        else ctx.lineTo(wx, wy);
+          // Unit Waypoint Trajectory Line
+          if (uWps.length > 1) {
+            ctx.strokeStyle = `${uColor}88`;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            uWps.forEach((wp, idx) => {
+              const wx = toCanvasX(wp.lon);
+              const wy = toCanvasY(wp.lat);
+              if (idx === 0) ctx.moveTo(wx, wy);
+              else ctx.lineTo(wx, wy);
+            });
+            ctx.stroke();
+
+            // Waypoint nodes
+            uWps.forEach((wp, idx) => {
+              const wx = toCanvasX(wp.lon);
+              const wy = toCanvasY(wp.lat);
+              ctx.fillStyle = idx === 0 ? uColor : `${uColor}55`;
+              ctx.beginPath();
+              ctx.arc(wx, wy, 2.0, 0, Math.PI * 2);
+              ctx.fill();
+            });
+          }
+        });
+      } else {
+        // Fallback: Primary single combine waypoints
+        const waypoints = missionPlan?.kinematics_details?.waypoints || [];
+        const currentWpIdx = telemetry?.current_waypoint_idx || 0;
+
+        if (waypoints.length > 1) {
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          waypoints.forEach((wp, idx) => {
+            const wx = toCanvasX(wp.lon);
+            const wy = toCanvasY(wp.lat);
+            if (idx === 0) ctx.moveTo(wx, wy);
+            else ctx.lineTo(wx, wy);
+          });
+          ctx.stroke();
+
+          // Draw Planned Waypoint Dots
+          waypoints.forEach((wp, idx) => {
+            const wx = toCanvasX(wp.lon);
+            const wy = toCanvasY(wp.lat);
+            ctx.fillStyle = idx < currentWpIdx ? "#10b981" : "rgba(255, 255, 255, 0.35)";
+            ctx.beginPath();
+            ctx.arc(wx, wy, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+          });
+        }
       }
-      ctx.stroke();
     }
+
 
     // 6. Draw Obstacles (if detected)
     if (activeObstacle) {
